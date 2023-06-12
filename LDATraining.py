@@ -66,7 +66,7 @@ for sub in subs:
         ax.set_ylabel('Mean Accuracy')
         ax.set_xlabel('Time')
         ax.axvspan(mean_accuracies_max[channel,1],mean_accuracies_max[channel,1]+.1,color = 'red', alpha=0.5)
-        ax.annotate(f'(Time: {mean_accuracies_max[channel,1]}, Accuracy: {mean_accuracies_max[channel,0]})', (mean_accuracies_max[channel,1]-1,10))
+        ax.annotate(f'(Time: {mean_accuracies_max[channel,1]:.0f}, Accuracy: {mean_accuracies_max[channel,0]:.2f})', xy=(mean_accuracies_max[channel,1] + 1,.5))
 
     plt.savefig(out_path + f'/Subject{sub}_top_ten_accuracies.png')
 # %%
