@@ -15,13 +15,14 @@ from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 #raw_path = '/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT06/EFRI06_WAR_SES1_Raw.mat'
 
 subs = ['06','07','10','12','13','15','16','17','18','21']
-subs = ['10', '12', '13']
+subs = ['06', '07']
 for sub in subs:
+    # ncsl_share = '/mnt/ncsl_share'
     ncsl_share = '/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main'
     setup_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat'
     raw_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat'
     data_path = f'Data/Subject{sub}_snapshot_normalized.npy'
-    out_path = 'Top_Ten_Accuracy_Graphs'
+    out_path_graphs = 'Top_Ten_Accuracy_Graphs'
     # data_path = f'/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy'
     # out_path = '/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main/\'Daniel Wang\'/Top_Ten_Accuracy_Graphs'
 
@@ -68,5 +69,5 @@ for sub in subs:
         ax.axvspan(mean_accuracies_max[channel,1],mean_accuracies_max[channel,1]+.1,color = 'red', alpha=0.5)
         ax.annotate(f'(Time: {mean_accuracies_max[channel,1]:.0f}, Accuracy: {mean_accuracies_max[channel,0]:.2f})', xy=(mean_accuracies_max[channel,1] + 1,.5))
 
-    plt.savefig(out_path + f'/Subject{sub}_top_ten_accuracies.png')
+    plt.savefig(out_path_graphs + f'/Subject{sub}_top_ten_accuracies.png')
 # %%
