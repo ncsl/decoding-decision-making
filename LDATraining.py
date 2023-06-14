@@ -76,23 +76,32 @@ def plot_LDA_accuracies():
     plt.savefig(out_path_graphs + f'/Subject{sub}_top_ten_accuracies.png')
 ## %%
 
-#%%
+# %%
+
 # subs = ['06','07','10','12','13','15','16','17','18','21']
 subs = ['06', '07']
+file_paths = {}
 
 for sub in subs:
-    # set file paths
+    # create a dictionary holding the file paths
     ncsl_share = '/mnt/ncsl_share'
-    setup_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat'
-    raw_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat'
-    data_path = ncsl_share + f'/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy'
-    out_path_graphs = 'Top_Ten_Accuracy_Graphs'
-    out_path_tvalues = f't_values'
+    file_paths[sub] = {
+        'setup_path': ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat',
+        'raw_path': ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat',
+        'data_path': ncsl_share + f'/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy',
+        'out_path_graphs': 'Top_Ten_Accuracy_Graphs',
+        'out_path_tvalues': f't_values'
+    }
+## %%
 
+#%%
+for sub in subs:
     # load appropriate files/data
-    raw_file = h5py.File(raw_path)
-    setup_data = mat73.loadmat(setup_path)
-    data = np.load(data_path)
+    raw_file = h5py.File(file_paths[sub]['raw_path'])
+    setup_data = mat73.loadmat(file_paths[sub]['setup_path'])
+    data = np.load(file_paths[sub]['data_path'])
+    out_path_graphs = file_paths[sub]['out_path_graphs']
+    out_path_tvalues = file_paths[sub]['out_path_tvalues']
 
     # instantiate approparite variables
     num_trials, num_channels, num_freqs, num_timesteps = data.shape
@@ -113,12 +122,13 @@ for sub in subs:
             train_LDA_model(data, y, channel, time)
 
     np.save(f'{out_path_tvalues}/Subject{sub}_tvalues.npy',t_values) # save t-values
-# %%
 
-for i in range(100):
+    for i in range(100):
     y_shuffled = shuffle_y(y,0.2)
     for channel in range(num_channels):
         for time in range(num_timesteps):
             train_LDA_model(data, y_shuffled, channel, time)
     
     np.save(f'{out_path_tvalues}/Subject{sub}_shuffled{i}_tvalues.npy',t_values) # save t-values
+
+## %%
