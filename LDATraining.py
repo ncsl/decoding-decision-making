@@ -10,42 +10,84 @@ from scipy import signal,stats
 from sklearn.model_selection import train_test_split, cross_validate
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
-#%%
-#setup_path = '/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT06/EFRI06_WAR_SES1_Setup.mat'
-#raw_path = '/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT06/EFRI06_WAR_SES1_Raw.mat'
+# %%
+def train_LDA_model(data, channel, time):
+    X = data[:, channel, :, time] # get the EEG data for a particular channel and time point
 
+    lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
+    cv_results = cross_validate(lda, X, y, cv=5, return_estimator=True)
+    
+    model_accuracies[channel, time] = cv_results['test_score'] # store the accuracies of the cross-validated model
+    max_index = list(model_accuracies[channel,time]).index(model_accuracies[channel,time].max()) 
+    best_lda = cv_results['estimator'][max_index] # select the best performing model after cross-validation
+    
+    prob_values[channel,time] = best_lda.predict_log_proba(X) # calculate the log of probabilities for classification of each class (ie decision value for each class)
+    t_stats[channel,time] = stats.ttest_ind(prob_values[channel,time,:,0],prob_values[channel,time,:,1]).statistic # perform t-test on log prob values (ie decision values for each class)
+## %%
+
+# %%
+def shuffle_y(y, alpha):
+    # Get the indices for each of the card values in subject_cards
+    card_value_indices = []
+    for i in [2,4,6,8,10]:
+        card_value_indices.append(np.where(subject_cards == i)[0])
+
+    y_shuffled = np.zeros(y.shape)
+    for indices in card_value_indices:
+        temp = indices
+        num_high_bets = y[indices].sum() + round(np.random.uniform(-1,1)*y[indices].sum()*alpha) # (1-alpha) is how much 
+        for j in range(num_high_bets):
+            if np.any(temp):
+                rand = np.random.choice(temp)
+                y_shuffled[rand] = 1
+                rand_index = np.where(temp == rand)[0]
+                temp = np.delete(temp,rand_index)
+        y_shuffled[temp] = 0
+
+    return y_shuffled
+## %%
+
+#%%
 subs = ['06','07','10','12','13','15','16','17','18','21']
 subs = ['06', '07']
+
 for sub in subs:
-    # ncsl_share = '/mnt/ncsl_share'
-    ncsl_share = '/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main'
+    # set file paths
+    ncsl_share = '/mnt/ncsl_share'
     setup_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat'
     raw_path = ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat'
-    data_path = f'Data/Subject{sub}_snapshot_normalized.npy'
+    data_path = ncsl_share + f'/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy'
     out_path_graphs = 'Top_Ten_Accuracy_Graphs'
-    # data_path = f'/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy'
-    # out_path = '/run/user/1006/gvfs/smb-share:server=10.162.37.21,share=main/\'Daniel Wang\'/Top_Ten_Accuracy_Graphs'
+    out_path_tvalues = f't_values'
 
+    # load appropriate files/data
     raw_file = h5py.File(raw_path)
     setup_data = mat73.loadmat(setup_path)
-    data = np.load(data_path, allow_pickle=True)
+    data = np.load(data_path)
 
-    num_channels = data.shape[1]
-    num_timesteps = data.shape[3]
+    num_trials, num_channels, num_freqs, num_timesteps = data.shape
 
+    # instantiate approparite variables
     bets = setup_data['filters']['bets']
-    y = np.asarray([(0 if bet == 5 else 1) for bet in bets if not np.isnan(bet)])
+    good_trials = np.where(np.isnan(bets) == False)[0] # extract indices of trials without 'nan' values
+    bets = bets[good_trials] # get the bet values for the good trials
+    subject_cards = setup_data['filters']['card1'][good_trials] # get the subject's card values for the good trials
 
-    model_accuracies = np.zeros((num_channels, num_timesteps, 5))  # Number of cross-validation folds (e.g., 5)
+    y = np.asarray([(0 if bet == 5 else 1) for bet in bets]) # 0 = low bet ($5), 1 = high bet ($20)
+    y_shuffled = shuffle_y(y,0.2)
 
+    model_accuracies = np.zeros((num_channels, num_timesteps, 5)) 
+    prob_values = np.zeros((num_channels, num_timesteps, num_trials, 2))
+    t_stats = np.zeros((num_channels,num_timesteps))
+
+    # Trains an LDA model on preprocessed data, implements cross validation, and extracts decision values  
     for channel in range(num_channels):
         for time in range(num_timesteps):
-            X = data[:, channel, :, time]
-            # X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
-            cv_results = cross_validate(lda, X, y, cv=5)
-            model_accuracies[channel, time] = cv_results['test_score']
+            train_LDA_model(data, channel, time)
 
+    np.save(f'{out_path_tvalues}/Subject{sub}_tvalues.npy',t_stats) # save t-values
+
+    # Calculate the mean accuracies for the LDA model after cross-validation
     mean_accuracies = np.mean(model_accuracies, axis=(2)) # Create an array storing the average accuracies for each channel at each timepoint
     mean_accuracies_max = np.zeros((num_channels,2))
 
