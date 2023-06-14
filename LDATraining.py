@@ -123,12 +123,13 @@ for sub in subs:
 
     np.save(f'{out_path_tvalues}/Subject{sub}_tvalues.npy',t_values) # save t-values
 
+    # Train LDA model on shuffled y labels, and calculate t-values
     for i in range(100):
-    y_shuffled = shuffle_y(y,0.2)
-    for channel in range(num_channels):
-        for time in range(num_timesteps):
-            train_LDA_model(data, y_shuffled, channel, time)
-    
-    np.save(f'{out_path_tvalues}/Subject{sub}_shuffled{i}_tvalues.npy',t_values) # save t-values
+        y_shuffled = shuffle_y(y,0.2)
+        for channel in range(num_channels):
+            for time in range(num_timesteps):
+                train_LDA_model(data, y_shuffled, channel, time)
+        
+        np.save(f'{out_path_tvalues}/Subject{sub}_shuffled{i}_tvalues.npy',t_values) # save t-values
 
 ## %%
