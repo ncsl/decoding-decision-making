@@ -1,17 +1,19 @@
 #%%
 import os
+import multiprocessing
 import h5py 
 import mat73
 import numpy as np
 from matplotlib import pyplot as plt
 import re
 import mne
-from scipy import signal,stats
-from sklearn.model_selection import train_test_split, cross_validate
+from scipy.stats import ttest_ind
+from sklearn.model_selection import cross_validate
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 
 # %%
-def train_LDA_model(data, y, channel, time):
+def train_LDA_model(y, channel, time):
+    data = np.load(file_paths[sub]['data_path'])
     X = data[:, channel, :, time] # get the EEG data for a particular channel and time point
 
     lda = LinearDiscriminantAnalysis(solver='lsqr', shrinkage='auto')
@@ -22,7 +24,7 @@ def train_LDA_model(data, y, channel, time):
     best_lda = cv_results['estimator'][max_index] # select the best performing model after cross-validation
     
     prob_values[channel,time] = best_lda.predict_log_proba(X) # calculate the log of probabilities for classification of each class (ie decision value for each class)
-    t_values[channel,time] = stats.ttest_ind(prob_values[channel,time,:,0],prob_values[channel,time,:,1]).statistic # perform t-test on log prob values (ie decision values for each class)
+    t_values[channel,time] = ttest_ind(prob_values[channel,time,:,0],prob_values[channel,time,:,1]).statistic # perform t-test on log prob values (ie decision values for each class)
 ## %%
 
 # %%
@@ -77,7 +79,6 @@ def plot_LDA_accuracies():
 ## %%
 
 # %%
-
 # subs = ['06','07','10','12','13','15','16','17','18','21']
 subs = ['06', '07']
 file_paths = {}
@@ -111,9 +112,17 @@ for sub in subs:
     bets = bets[good_trials]
     subject_cards = setup_data['filters']['card1'][good_trials] # get the subject's card values for the good trials
 
+    #################
+
     model_accuracies = np.zeros((num_channels, num_timesteps, 5)) 
     prob_values = np.zeros((num_channels, num_timesteps, num_trials, 2))
     t_values = np.zeros((num_channels,num_timesteps))
+
+    
+
+    if __name__ == '__main__':
+        with multiprocessing.Pool() as pool:
+            results = pool.starmap(train_LDA_model,range(100))
 
     # Trains an LDA model on preprocessed data, implements cross validation, and performs t-test on decision values  
     y = np.asarray([(0 if bet == 5 else 1) for bet in bets]) # 0 = low bet ($5), 1 = high bet ($20)
