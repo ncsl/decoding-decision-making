@@ -23,7 +23,8 @@ for sub in subs:
         'raw_path': ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat',
         'data_path': ncsl_share + f'/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy',
         'out_path_graphs': 'Top_Ten_Accuracy_Graphs',
-        'out_path_tvalues': f't_values'
+        'out_path_tvalues': f't_values',
+        'out_path_plots': f'Plots/Subject{sub}'
     }
 ## %%
 # %%
@@ -125,7 +126,7 @@ def plot_sorted_scores(metrics, best_scores_max_sorted):
     time = best_scores_max_sorted[:,1]/(20/metrics['Time Resolution']) -3
     axs[2].scatter(np.arange(0, num_channels), time)
     
-    plt.savefig('accuracy_plots/sorted_accuracies.png')
+    plt.savefig(out_path + f'/Sorted_scores')
     plt.show()
 ## %%
 # %%
@@ -149,11 +150,11 @@ def plot_sorted_scores_per_channel(num_plots, metrics, best_scores_max_sorted):
         ax.axvspan(time - .0025 ,time + .0025, color = 'red', alpha=0.5)
         ax.annotate(f'(Time: {time:.2f}s, Score: {peak_accuracy:.2f})', xy=(time + .05 ,.6))
     
-    plt.savefig('accuracy_plots/accuracies_line.png')
+    plt.savefig(out_path + f'/Scores_per_channel')
     plt.show()
 ## %%
 # %%
-def plot_power_heatmap(data, num_plots, metrics, best_scores_max_sorted):
+def plot_power_heatmap(data, num_plots, metrics, best_scores_max_sorted, out_path):
     num_freqs, num_timesteps = data.shape[2:]
     time_resolution = metrics['Time Resolution']
     rescaled_timesteps = int(num_timesteps/time_resolution)
@@ -192,11 +193,8 @@ def plot_power_heatmap(data, num_plots, metrics, best_scores_max_sorted):
             ax.set_yticklabels(yticklabels)
             ax.set(xlabel="Trial Indices", ylabel="Frequency (Hz)")
         
-    plt.savefig('accuracy_plots/heatmaps/.png')
+    plt.savefig(out_path + f'/Heatmaps/Accuracy_Ranking_{i}')
     plt.show()
-
-        # TODO: Add line graph on top of heatmap
-        # sns.lineplot(x=np.arange(0,100), y=t_stats[0])
 ## %%
 # %%
 def sort_scores(data, metrics):
