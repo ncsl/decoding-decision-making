@@ -104,7 +104,7 @@ def shuffle_y(y):
 ## %%
 
 # %%
-def plot_sorted_scores(metrics, best_scores_max_sorted):
+def plot_sorted_scores(metrics, best_scores_max_sorted, out_path):
     num_channels = data.shape[1]
     
     fig, axs = plt.subplots(3, 1, figsize=(24, 18))
@@ -130,7 +130,7 @@ def plot_sorted_scores(metrics, best_scores_max_sorted):
     plt.show()
 ## %%
 # %%
-def plot_sorted_scores_per_channel(num_plots, metrics, best_scores_max_sorted):
+def plot_sorted_scores_per_channel(metrics, best_scores_max_sorted, num_plots, out_path):
     num_timesteps = data.shape[3]
 
     time_resolution = metrics['Time Resolution']
@@ -154,7 +154,7 @@ def plot_sorted_scores_per_channel(num_plots, metrics, best_scores_max_sorted):
     plt.show()
 ## %%
 # %%
-def plot_power_heatmap(data, num_plots, metrics, best_scores_max_sorted, out_path):
+def plot_power_heatmap(data, metrics, best_scores_max_sorted, num_plots, out_path):
     num_freqs, num_timesteps = data.shape[2:]
     time_resolution = metrics['Time Resolution']
     rescaled_timesteps = int(num_timesteps/time_resolution)
@@ -232,9 +232,7 @@ for sub in subs:
     out_path_graphs = file_paths[sub]['out_path_graphs']
     out_path_tvalues = file_paths[sub]['out_path_tvalues']
 
-    # instantiate approparite variables
-    num_trials, num_channels, num_freqs, num_timesteps = data.shape
-  
+    # instantiate approparite variables  
     bets = setup_data['filters']['bets']
     good_trials = np.where(np.isnan(bets) == False)[0]
     bets = bets[good_trials]
