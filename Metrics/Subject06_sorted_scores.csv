@@ -1,0 +1,190 @@
+Sorted Max Scores,Sorted Electrode Names,Sorted Electrode Areas
+"[[ 10.          31.           0.83783784]
+ [ 12.          32.           0.81081081]
+ [ 44.          11.           0.81081081]
+ [ 43.          14.           0.81081081]
+ [111.          18.           0.81081081]
+ [ 23.          14.           0.78378378]
+ [118.          20.           0.78378378]
+ [100.           9.           0.78378378]
+ [ 14.           2.           0.78378378]
+ [ 55.           0.           0.78378378]
+ [ 51.          13.           0.78378378]
+ [  9.          48.           0.78378378]
+ [ 37.          11.           0.78378378]
+ [  8.          43.           0.78378378]
+ [ 71.          38.           0.78378378]
+ [122.           4.           0.78378378]
+ [  6.          44.           0.78378378]
+ [ 47.           3.           0.78378378]
+ [ 49.          22.           0.78378378]
+ [ 46.           0.           0.78378378]
+ [ 29.          36.           0.75675676]
+ [ 33.          47.           0.75675676]
+ [ 88.          25.           0.75675676]
+ [ 87.          15.           0.75675676]
+ [ 89.           8.           0.75675676]
+ [ 27.          47.           0.75675676]
+ [ 34.          21.           0.75675676]
+ [ 66.          37.           0.75675676]
+ [ 38.          22.           0.75675676]
+ [ 39.           2.           0.75675676]
+ [ 75.           2.           0.75675676]
+ [ 42.          17.           0.75675676]
+ [ 92.          26.           0.75675676]
+ [ 70.          36.           0.75675676]
+ [ 45.          21.           0.75675676]
+ [ 62.           2.           0.75675676]
+ [ 50.          15.           0.75675676]
+ [ 59.          13.           0.75675676]
+ [ 52.          17.           0.75675676]
+ [ 91.          44.           0.75675676]
+ [ 25.          13.           0.75675676]
+ [ 56.           4.           0.75675676]
+ [113.          37.           0.75675676]
+ [ 11.          29.           0.75675676]
+ [116.          42.           0.75675676]
+ [119.          23.           0.75675676]
+ [  7.          23.           0.75675676]
+ [106.          22.           0.75675676]
+ [124.          47.           0.75675676]
+ [  4.           2.           0.75675676]
+ [  3.          25.           0.75675676]
+ [ 19.          10.           0.75675676]
+ [102.           4.           0.75675676]
+ [127.          45.           0.75675676]
+ [128.          46.           0.75675676]
+ [101.          20.           0.75675676]
+ [  1.           0.           0.75675676]
+ [ 21.           5.           0.75675676]
+ [110.          18.           0.75675676]
+ [ 48.          24.           0.72972973]
+ [  2.          20.           0.72972973]
+ [ 54.           1.           0.72972973]
+ [ 26.           5.           0.72972973]
+ [ 15.          47.           0.72972973]
+ [ 24.           5.           0.72972973]
+ [ 40.           7.           0.72972973]
+ [ 16.          15.           0.72972973]
+ [ 17.          36.           0.72972973]
+ [ 18.          27.           0.72972973]
+ [ 36.          17.           0.72972973]
+ [ 35.          38.           0.72972973]
+ [ 31.          19.           0.72972973]
+ [ 30.           2.           0.72972973]
+ [ 28.           0.           0.72972973]
+ [ 20.          12.           0.72972973]
+ [ 22.          34.           0.72972973]
+ [ 41.          32.           0.72972973]
+ [  0.           3.           0.72972973]
+ [ 57.          47.           0.72972973]
+ [107.          19.           0.72972973]
+ [ 83.          47.           0.72972973]
+ [ 85.          26.           0.72972973]
+ [ 96.          21.           0.72972973]
+ [ 98.           9.           0.72972973]
+ [103.          49.           0.72972973]
+ [104.          21.           0.72972973]
+ [108.          39.           0.72972973]
+ [ 79.           4.           0.72972973]
+ [112.           2.           0.72972973]
+ [115.          14.           0.72972973]
+ [120.          49.           0.72972973]
+ [123.           5.           0.72972973]
+ [129.           1.           0.72972973]
+ [130.          21.           0.72972973]
+ [ 82.          16.           0.72972973]
+ [ 90.           6.           0.72972973]
+ [ 78.          19.           0.72972973]
+ [ 67.          24.           0.72972973]
+ [ 58.          13.           0.72972973]
+ [ 60.          10.           0.72972973]
+ [ 61.           1.           0.72972973]
+ [ 63.          44.           0.72972973]
+ [ 64.          22.           0.72972973]
+ [ 65.           3.           0.72972973]
+ [131.          48.           0.72972973]
+ [ 68.          14.           0.72972973]
+ [ 77.          14.           0.72972973]
+ [ 93.          15.           0.7027027 ]
+ [ 74.           1.           0.7027027 ]
+ [ 81.           6.           0.7027027 ]
+ [126.          34.           0.7027027 ]
+ [125.          27.           0.7027027 ]
+ [  5.           3.           0.7027027 ]
+ [ 32.           5.           0.7027027 ]
+ [121.           1.           0.7027027 ]
+ [ 76.          10.           0.7027027 ]
+ [117.          10.           0.7027027 ]
+ [ 84.          17.           0.7027027 ]
+ [114.           2.           0.7027027 ]
+ [ 13.          10.           0.7027027 ]
+ [ 94.          22.           0.7027027 ]
+ [109.           4.           0.7027027 ]
+ [ 86.           9.           0.7027027 ]
+ [ 53.          19.           0.7027027 ]
+ [105.           3.           0.7027027 ]
+ [ 80.          13.           0.7027027 ]
+ [ 69.          42.           0.7027027 ]
+ [ 99.           2.           0.7027027 ]
+ [ 72.          29.           0.7027027 ]
+ [ 97.           7.           0.7027027 ]
+ [ 73.          29.           0.7027027 ]
+ [ 95.          25.           0.7027027 ]
+ [132.          12.           0.67567568]]","[""C'10"" ""C'8"" ""F'6"" ""F'7"" ""U'9"" ""D'7"" ""U'2"" ""S'10"" ""C'6"" ""I'5"" ""I'9"" ""B'1""
+ ""E'3"" ""B'2"" ""O'9"" ""X'8"" ""B'4"" ""F'3"" ""F'1"" ""F'4"" ""D'1"" ""E'7"" ""P'2"" ""P'3""
+ ""P'1"" ""D'3"" ""E'6"" ""M'4"" ""E'2"" ""E'1"" ""O'5"" ""F'8"" ""R'8"" ""O'10"" ""F'5"" ""M'8""
+ ""I'10"" ""I'1"" ""I'8"" ""R'9"" ""D'5"" ""I'4"" ""U'7"" ""C'9"" ""U'4"" ""U'1"" ""B'3"" ""S'4""
+ ""X'6"" ""B'6"" ""B'7"" ""C'1"" ""S'8"" ""X'3"" ""X'2"" ""S'9"" ""B'9"" ""D'9"" ""U'10"" ""F'2""
+ ""B'8"" ""I'6"" ""D'4"" ""C'5"" ""D'6"" ""F'10"" ""C'4"" ""C'3"" ""C'2"" ""E'4"" ""E'5"" ""E'9""
+ ""E'10"" ""D'2"" ""D'10"" ""D'8"" ""F'9"" ""B'10"" ""I'3"" ""S'3"" ""P'7"" ""P'5"" ""R'4""
+ ""R'2"" ""S'7"" ""S'6"" ""S'2"" ""O'1"" ""U'8"" ""U'5"" ""X'10"" ""X'7"" ""X'1"" 'REF1' ""P'8""
+ ""R'10"" ""O'2"" ""M'3"" ""I'2"" ""M'10"" ""M'9"" ""M'7"" ""M'6"" ""M'5"" 'REF2' ""M'2""
+ ""O'3"" ""R'7"" ""O'6"" ""P'9"" ""X'4"" ""X'5"" ""B'5"" ""E'8"" ""X'9"" ""O'4"" ""U'3"" ""P'6""
+ ""U'6"" ""C'7"" ""R'6"" ""S'1"" ""P'4"" ""I'7"" ""S'5"" ""P'10"" ""M'1"" ""R'1"" ""O'8"" ""R'3""
+ ""O'7"" ""R'5"" 'E']","['middle temporal gyrus L' 'middle temporal gyrus L'
+ 'inferior temporal gyrus L' 'inferior temporal gyrus L'
+ 'superior temporal gyrus (planum temporale) L'
+ 'superior temporal gyrus (planum temporale) L' 'white matter' 'out'
+ 'white matter' 'white matter' 'middle temporal gyrus L'
+ 'hippocampus (anterior) L' 'entorhinal cortex L'
+ 'hippocampus (anterior) L' 'occipital gyrus (lateral) L' 'white matter'
+ 'fusiform gyrus L' 'white matter' 'fusiform gyrus L' 'white matter'
+ 'white matter' 'white matter' 'precuneus L' 'white matter' 'precuneus L'
+ 'superior temporal sulcus L' 'fusiform gyrus L'
+ 'superior frontal gyrus L' 'entorhinal cortex L' 'entorhinal cortex L'
+ 'white matter' 'inferior temporal gyrus L' 'cerebrospinal fluid'
+ 'occipital gyrus (lateral) L' 'fusiform gyrus L' 'middle frontal gyrus L'
+ 'out' 'temporal pole L' 'middle temporal gyrus L' 'cerebrospinal fluid'
+ 'superior temporal gyrus (planum temporale) L' 'white matter'
+ 'white matter' 'middle temporal gyrus L' 'white matter' 'white matter'
+ 'white matter' 'parietal operculum L' 'white matter' 'white matter'
+ 'white matter' 'hippocampus (posterior) L' 'out'
+ 'parietooccipital sulcus L' 'cingulate cortex (posterior) L' 'out'
+ 'middle temporal gyrus L' 'out'
+ 'superior temporal gyrus (planum temporale) L' 'fusiform gyrus L'
+ 'middle temporal gyrus L' 'inferior temporal gyrus L'
+ 'superior temporal sulcus L' 'white matter'
+ 'superior temporal gyrus (planum temporale) L' 'out' 'white matter'
+ 'hippocampus (posterior) L' 'hippocampus (posterior) L'
+ 'fusiform gyrus L' 'fusiform gyrus L' 'inferior temporal gyrus L'
+ 'inferior temporal gyrus L' 'superior temporal sulcus L' 'out' 'out'
+ 'inferior temporal gyrus L' 'middle temporal gyrus L' 'white matter'
+ 'parietal operculum L' 'inferior parietal lobule L'
+ 'superior parietal lobule L' 'insular cortex (posterior) L'
+ 'white matter' 'out' 'postcentral gyrus L' 'parietal operculum L'
+ 'lingula gyrus L' 'white matter' 'white matter' 'supramarginal gyrus L'
+ 'white matter' 'cingulate cortex (posterior) L' 'FZ'
+ 'inferior parietal lobule L' 'cerebrospinal fluid' 'lingula gyrus L'
+ 'white matter' 'temporal pole L' 'out' 'out' 'middle frontal gyrus L'
+ 'middle frontal gyrus L' 'middle frontal gyrus L' 'CZ'
+ 'superior frontal gyrus (mesial surface) L' 'white matter'
+ 'parietal operculum L' 'white matter' 'inferior parietal lobule L'
+ 'white matter' 'white matter' 'fusiform gyrus L'
+ 'inferior temporal gyrus L' 'supramarginal gyrus L' 'white matter'
+ 'white matter' 'intraparietal sulcus L' 'white matter' 'white matter'
+ 'parietal operculum L' 'parietal operculum L'
+ 'superior parietal lobule L' 'middle temporal gyrus L'
+ 'parietal operculum L' 'out' 'superior frontal gyrus (mesial surface) L'
+ 'white matter' 'occipital gyrus (lateral) L'
+ 'insular cortex (posterior) L' 'white matter' 'parietal operculum L' 'PZ']"
