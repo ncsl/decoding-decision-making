@@ -4,6 +4,7 @@ import mat73
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import csv
 import mne
 from matplotlib import pyplot as plt
 from sklearn.model_selection import cross_validate
@@ -22,8 +23,7 @@ for sub in subs:
         'setup_path': ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat',
         'raw_path': ncsl_share + f'/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Raw.mat',
         'data_path': ncsl_share + f'/Daniel/Data/Trial_by_Chan_by_Freq_by_Time_Snapshots/Subject{sub}_snapshot_normalized.npy',
-        'out_path_graphs': 'Top_Ten_Accuracy_Graphs',
-        'out_path_tvalues': f't_values',
+        'out_path_metrics': f'Metrics/Subject{sub}',
         'out_path_plots': f'Plots/Subject{sub}'
     }
 ## %%
@@ -77,7 +77,6 @@ def calculate_LDA_metrics(data, y, time_resolution):
     
     return metrics
 ## %%
-
 # %%
 def shuffle_y(y):
     # Get the locations for each particular card value
@@ -102,7 +101,14 @@ def shuffle_y(y):
 
     return y_shuffled
 ## %%
-
+# %%
+def get_shuffled_t_stats(data, y):
+  np.random.seed()
+  y_shuffled = shuffle_y(y)
+  metrics = calculate_LDA_metrics(data=data, y=y_shuffled, time_resolution=2)
+    
+  return metrics['T Stats']
+## %%
 # %%
 def plot_sorted_scores(metrics, best_scores_max_sorted, out_path):
     num_channels = data.shape[1]
@@ -126,7 +132,7 @@ def plot_sorted_scores(metrics, best_scores_max_sorted, out_path):
     time = best_scores_max_sorted[:,1]/(20/metrics['Time Resolution']) -3
     axs[2].scatter(np.arange(0, num_channels), time)
     
-    plt.savefig(out_path + f'/Sorted_scores')
+    plt.savefig(out_path + f'_sorted_scores')
     plt.show()
 ## %%
 # %%
@@ -150,7 +156,7 @@ def plot_sorted_scores_per_channel(metrics, best_scores_max_sorted, num_plots, o
         ax.axvspan(time - .0025 ,time + .0025, color = 'red', alpha=0.5)
         ax.annotate(f'(Time: {time:.2f}s, Score: {peak_accuracy:.2f})', xy=(time + .05 ,.6))
     
-    plt.savefig(out_path + f'/Scores_per_channel')
+    plt.savefig(out_path + f'_sorted_scores_per_channel')
     plt.show()
 ## %%
 # %%
@@ -193,8 +199,8 @@ def plot_power_heatmap(data, metrics, best_scores_max_sorted, num_plots, out_pat
             ax.set_yticklabels(yticklabels)
             ax.set(xlabel="Trial Indices", ylabel="Frequency (Hz)")
         
-    plt.savefig(out_path + f'/Heatmaps/Accuracy_Ranking_{i}')
-    plt.show()
+        plt.savefig(out_path + f'_heatmap_{i}')
+        plt.show()
 ## %%
 # %%
 def sort_scores(data, metrics):
@@ -215,22 +221,20 @@ def sort_scores(data, metrics):
     return best_scores_max_sorted, elec_names_sorted, elec_areas_sorted
 ## %%
 # %%
-def plot_scores(data, metrics):
+def plot_scores(data, metrics, out_path_plots):    
     best_scores_max_sorted, elec_names_sorted, elec_areas_sorted = sort_scores(data, metrics)
-    plot_sorted_scores(metrics, best_scores_max_sorted)
-    plot_sorted_scores_per_channel(10, metrics, best_scores_max_sorted)
-    plot_power_heatmap(data, 10, metrics, best_scores_max_sorted)
-
-    return (elec_names_sorted, elec_areas_sorted)
+    plot_sorted_scores(metrics, best_scores_max_sorted, out_path_plots)
+    plot_sorted_scores_per_channel(metrics, best_scores_max_sorted, 10, out_path_plots)
+    plot_power_heatmap(data, metrics, best_scores_max_sorted, 10, out_path_plots)
 ## %%
 #%%
 for sub in subs:
     # load appropriate files/data
     raw_file = h5py.File(file_paths[sub]['raw_path'])
     setup_data = mat73.loadmat(file_paths[sub]['setup_path'])
-    data = np.load(file_paths[sub]['data_path'])
-    out_path_graphs = file_paths[sub]['out_path_graphs']
-    out_path_tvalues = file_paths[sub]['out_path_tvalues']
+
+    out_path_plots = file_paths[sub]['out_path_plots']
+    out_path_metrics = file_paths[sub]['out_path_metrics']
 
     # instantiate approparite variables  
     bets = setup_data['filters']['bets']
@@ -238,33 +242,33 @@ for sub in subs:
     bets = bets[good_trials]
     subject_cards = setup_data['filters']['card1'][good_trials] # get the subject's card values for the good trials
 
-    #################
+    elec_names = np.array(setup_data['elec_name'])
+    elec_areas = np.array(setup_data['elec_area'])
 
-    model_accuracies = np.zeros((num_channels, num_timesteps, 5)) 
-    prob_values = np.zeros((num_channels, num_timesteps, num_trials, 2))
-    t_values = np.zeros((num_channels,num_timesteps))
-
-    
-
-    if __name__ == '__main__':
-        with multiprocessing.Pool() as pool:
-            results = pool.starmap(train_LDA_model,range(100))
-
-    # Trains an LDA model on preprocessed data, implements cross validation, and performs t-test on decision values  
+    data = np.load(file_paths[sub]['data_path'])
     y = np.asarray([(0 if bet == 5 else 1) for bet in bets]) # 0 = low bet ($5), 1 = high bet ($20)
-    for channel in range(num_channels):
-        for time in range(num_timesteps):
-            train_LDA_model(data, y, channel, time)
 
-    np.save(f'{out_path_tvalues}/Subject{sub}_tvalues.npy',t_values) # save t-values
+    # calculate metrics and create plots
+    metrics = calculate_LDA_metrics(data,y,time_resolution=2)
 
-    # Train LDA model on shuffled y labels, and calculate t-values
-    for i in range(100):
-        y_shuffled = shuffle_y(y,0.2)
-        for channel in range(num_channels):
-            for time in range(num_timesteps):
-                train_LDA_model(data, y_shuffled, channel, time)
-        
-        np.save(f'{out_path_tvalues}/Subject{sub}_shuffled{i}_tvalues.npy',t_values) # save t-values
+    with open(out_path_metrics+'_LDA_metrics.csv', 'w', newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=metrics.keys())
+        writer.writeheader()
+        writer.writerow(metrics)
 
+    best_scores_max_sorted, elec_names_sorted, elec_areas_sorted = sort_scores(data,metrics)
+    
+    sorted_scores = {
+        'Sorted Max Scores' : best_scores_max_sorted,
+        'Sorted Electrode Names' : elec_names_sorted,
+        'Sorted Electrode Areas' : elec_areas_sorted
+    }
+
+    with open(out_path_metrics+'_sorted_scores.csv', 'w', newline="") as fp:
+        writer = csv.DictWriter(fp, fieldnames=sorted_scores.keys())
+        writer.writeheader()
+        writer.writerow(sorted_scores)
+    
+    plot_scores(data, metrics, out_path_plots)
 ## %%
+# %%
