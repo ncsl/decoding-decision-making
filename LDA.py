@@ -105,6 +105,33 @@ class LDA(object):
         self.t_stats.append(t_stat)
         self.p_vals.append(p_val)
 
+    def create_cluster_idxs(self, threshold):
+        if self.t_stats.shape == (self.__num_channels, self.__rescaled_timesteps, 1):
+            cluster_idxs = []
+
+            for channel in range(self.__num_channels):
+                ch_cluster_idxs = []
+                threshold_idxs = [i for i, t_stat in enumerate(self.t_stats[channel].flatten()) if np.abs(t_stat) > threshold]
+                temp_cluster_idxs = [threshold_idxs[0]]
+            
+                # Groups consecutive clusters together
+                for i in range(len(threshold_idxs) - 1):
+                    if threshold_idxs[i+1] - threshold_idxs[i] == 1:
+                        temp_cluster_idxs.append(threshold_idxs[i+1])
+                    else:
+                        ch_cluster_idxs.append(temp_cluster_idxs)
+                        temp_cluster_idxs = [threshold_idxs[i+1]]
+                
+                if len(temp_cluster_idxs) != 0:
+                    ch_cluster_idxs.append(temp_cluster_idxs)
+                
+                cluster_idxs.append(ch_cluster_idxs)
+            
+            return cluster_idxs
+        else:
+            Exception('Cannot create clusters with these attributes, make sure shape of attributes is (num_channels, rescaled_timesteps, 1)')
+
+
     def train_per_channel_and_timestep(self, data, y, time_resolution):
         self.__set_attributes(data, time_resolution)
 
