@@ -6,6 +6,7 @@ from scipy.stats import ttest_1samp
 class LDA(object):
     def __init__(
         self,
+        data = None,
         setup_data = None
         ):
         self.mean_scores = []
@@ -18,8 +19,7 @@ class LDA(object):
         self.diff_avg_powers = []
         self.lda_coefs = []
 
-        if not setup_data == None:
-            self.__elec_areas = setup_data['elec_area']
+        self.__set_attributes(data, setup_data)
 
     @property
     def num_trials(self):
@@ -58,17 +58,11 @@ class LDA(object):
             if not attr_name.startswith('_'):
                 setattr(self, attr_name, np.reshape(getattr(self, attr_name), new_shape))
 
-    def __set_attributes(self, data, time_resolution):
+    def __set_attributes(self, data, setup_data):
         self.__num_trials, self.__num_channels, self.__num_freqs, self.__num_timesteps = data.shape
 
-        # Checks that input value for time resolution is valid
-        if time_resolution == None:
-            pass
-        elif not(self.__num_timesteps % time_resolution == 0):
-            raise Exception("Invalid time resolution size, num_timesteps % resolution must equal 0")
-        else:
-            self.__time_resolution = time_resolution
-            self.__rescaled_timesteps = int(self.__num_timesteps/time_resolution)
+        self.__elec_areas = setup_data['elec_area']
+        self.__elec_names = setup_data['elec_name']
 
     def __filter_channels(self):
         return [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
@@ -131,9 +125,24 @@ class LDA(object):
         else:
             Exception('Cannot create clusters with these attributes, make sure shape of attributes is (num_channels, rescaled_timesteps, 1)')
 
+    def compute_t_stat_clusters(self, threshold):
+        t_stat_sums = []
+
+        for channel in range(self.num_channels):
+            temp_t_stat_sums = []
+            for arr in self.create_cluster_idxs(threshold)[channel]:
+                temp_t_stat_sums.append(self.t_stats[channel][arr].sum())
+            
+            t_stat_sums.append(temp_t_stat_sums)
+        
+        return t_stat_sums
 
     def train_per_channel_and_timestep(self, data, y, time_resolution):
-        self.__set_attributes(data, time_resolution)
+        if not(self.__num_timesteps % time_resolution == 0):
+            raise Exception("Invalid time resolution size, num_timesteps % resolution must equal 0")
+        else:
+            self.__time_resolution = time_resolution
+            self.__rescaled_timesteps = int(self.__num_timesteps/time_resolution)
 
         for channel in range(self.__num_channels):
             for time in range(self.__rescaled_timesteps):
@@ -143,7 +152,11 @@ class LDA(object):
         self.__reshape_attributes((self.__num_channels,self.__rescaled_timesteps,-1))
 
     def train_on_all_channels(self, data, y, time_resolution, filter_channels:bool = False):
-        self.__set_attributes(data, time_resolution)
+        if not(self.__num_timesteps % time_resolution == 0):
+            raise Exception("Invalid time resolution size, num_timesteps % resolution must equal 0")
+        else:
+            self.__time_resolution = time_resolution
+            self.__rescaled_timesteps = int(self.__num_timesteps/time_resolution)
 
         for time in range(self.__rescaled_timesteps):
             if filter_channels:
@@ -157,11 +170,80 @@ class LDA(object):
         self.__reshape_attributes((self.__rescaled_timesteps,-1))
     
     def train_on_all_timesteps(self, data, y):
-        self.__set_attributes(data, None)
-
         for channel in range(self.__num_channels):
             X = self.__create_X(data, channel, np.arange(self.__num_timesteps))
             X_reshaped = X.reshape(self.__num_trials, -1)
             self.__train(X_reshaped, y)
         
         self.__reshape_attributes((self.__num_channels,-1))
+
+class ShuffledLDA(LDA):
+    def __init__(self, 
+                 data=None, 
+                 setup_data=None):
+        super().__init__(data, setup_data)
+        self.__get_hand(setup_data)
+
+        
+    def __get_hand(self, setup_data):
+        bets = setup_data['filters']['bets']
+        good_trials = np.where(np.isnan(bets) == False)[0] # extract indices of trials without the 'nan'
+
+        self.__sub_hand = setup_data['filters']['card1'][good_trials] # get the subject's card hand for the good trials
+    
+    def __shuffle_y(self, y):
+        """
+        Randomly shuffle the elements of y to be in different locations.
+
+        Parameters
+        ----------
+            y : arr, required
+        The labels that the LDA model is to be trained on
+
+        Returns
+        -------
+            y_shuffled : arr
+        An array with the elements of y randomly shuffled to be in different locations.
+        """
+        
+        np.random.seed()
+
+        print('Shuffling!')
+
+        # Get the locations for each particular card value
+        card_value_indices = []
+        for i in [2,4,6,8,10]:
+            card_value_indices.append(np.where(self.__sub_hand == i)[0])
+
+        y_shuffled = np.zeros(y.shape)
+
+        # Ensure that the number of high bets in the shuffled y labels is consistent with the card value
+        for indices in card_value_indices:
+            temp = indices
+            num_high_bets = y[indices].sum() + round(np.random.uniform(-1,1)*y[indices].sum()*0.2) # Get the number of high bets for a particular card value and add some randomness to it
+            for _ in range(num_high_bets):
+                if np.any(temp):
+                    # Pick a random location from all possible locations of that particular card value and set it to 1 (ie high bet)
+                    rand = np.random.choice(temp)
+                    y_shuffled[rand] = 1
+                    rand_index = np.where(temp == rand)[0]
+                    temp = np.delete(temp,rand_index) # Remove that location from being able to be chosen again
+            y_shuffled[temp] = 0 # set all other locations for that particular card value to 0 (ie low bet)
+
+        return y_shuffled
+    
+    def train_per_channel_and_timestep(self, data, y, time_resolution):
+        y_shuffled = self.__shuffle_y(y)
+        super().train_per_channel_and_timestep(data, y_shuffled, time_resolution)
+
+    def compute_t_stat_clusters(self, cluster_estimator, threshold):
+        t_stat_sums = []
+
+        for channel in range(self.num_channels):
+            temp_t_stat_sums = []
+            for arr in cluster_estimator.create_cluster_idxs(threshold)[channel]:
+                temp_t_stat_sums.append(self.t_stats[channel][arr].sum())
+            
+            t_stat_sums.append(temp_t_stat_sums)
+        
+        return t_stat_sums
