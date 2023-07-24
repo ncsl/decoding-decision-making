@@ -7,16 +7,13 @@ class PerChannelTimestep(object):
     def __init__(
         self,
         estimator,
-        setup_data,
-        filter_channels = True
+        filter_channels = False
         ) :
         self.__estimator = estimator
-        self.__elec_names = np.array(setup_data['elec_name'])
-        self.__elec_areas = np.array(setup_data['elec_area'])
 
-        self.__sort_scores(filter_channels)
+        self._sort_scores(filter_channels)
 
-    def __sort_scores(self, filter_channels:bool):
+    def _sort_scores(self, filter_channels:bool):
 
         max_mean_scores = np.zeros((self.__estimator.num_channels,3))
 
@@ -26,17 +23,17 @@ class PerChannelTimestep(object):
             max_mean_scores[channel, 2] = max(self.__estimator.mean_scores[channel]) # value of the maximum mean score in a particular channel for all time points
 
         if filter_channels == True:
-            elec_areas_filtered_idx = [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
+            elec_areas_filtered_idx = [i for i,ea in enumerate(self.__estimator.elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
             sorted_indices = max_mean_scores[elec_areas_filtered_idx,2].argsort()[::-1]
             self.sorted_max_mean_scores = max_mean_scores[elec_areas_filtered_idx][sorted_indices]
-            self.sorted_elec_names = self.__elec_names[np.int_(self.sorted_max_mean_scores[:, 0])]
-            self.sorted_elec_areas = self.__elec_areas[np.int_(self.sorted_max_mean_scores[:, 0])]
+            self.sorted_elec_names = [self.__estimator.elec_names[i] for i in np.int_(self.sorted_max_mean_scores[:, 0])]
+            self.sorted_elec_areas = [self.__estimator.elec_areas[i] for i in np.int_(self.sorted_max_mean_scores[:, 0])]
             
         else:
             sorted_indices = max_mean_scores[:,2].argsort()[::-1]
             self.sorted_max_mean_scores = max_mean_scores[sorted_indices]
-            self.sorted_elec_names = self.__elec_names[sorted_indices]
-            self.sorted_elec_areas = self.__elec_areas[sorted_indices]
+            self.sorted_elec_names = [self.__estimator.elec_names[i] for i in sorted_indices]
+            self.sorted_elec_areas = [self.__estimator.elec_areas[i] for i in sorted_indices]
 
     def plot_sorted_scores(self, out_path:str):
         num_channels = len(self.sorted_max_mean_scores)
@@ -190,19 +187,20 @@ class PerTimestepAllChannels(object):
         ) :
         self.__estimator = estimator
 
-        self.__sort_scores()
-        self.__convert_timesteps_to_time(3)
-
-    def __sort_scores(self):
+        self._sort_scores()
+        self._convert_timesteps_to_time(3)
+        
+    def _sort_scores(self):
 
         enumerated_mean_scores = np.array(list(enumerate(self.__estimator.mean_scores.flatten())))
         sorted_indices = enumerated_mean_scores[:,1].argsort()[::-1]
         self.sorted_mean_scores = enumerated_mean_scores[sorted_indices]
 
-    def __convert_timesteps_to_time(self, event_delay):
+    def _convert_timesteps_to_time(self, event_delay):
         self.__event_delay = event_delay
         self.__times = (np.arange(0, self.__estimator.rescaled_timesteps) / (20/self.__estimator.time_resolution)) - event_delay # time 0 seconds denotes when the subject starts moving (i.e. 3 seconds into the data)
 
+    
     def plot_sorted_scores(self, out_path:str):
         num_timesteps = self.__estimator.rescaled_timesteps
         xticks = np.arange(0,num_timesteps,1)
@@ -233,6 +231,7 @@ class PerTimestepAllChannels(object):
         fig.savefig(out_path + '_sorted_scores_per_timestep_all_channels')
     
     def plot_power_heatmap(self, out_path:str):
+
         num_freqs = self.__estimator.num_freqs
         time_resolution = self.__estimator.time_resolution
         rescaled_timesteps = self.__estimator.rescaled_timesteps
@@ -247,9 +246,6 @@ class PerTimestepAllChannels(object):
         else:
             num_xticks = rescaled_timesteps
 
-        xticks = np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)
-        xticklabels = np.around(np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)/(20/time_resolution) - self.__event_delay, decimals=2)
-
         if num_freqs == 5: 
             # sets the y-ticks when using EEG frequency bands
             yticks = np.arange(diff_bet_powers.shape[1], step=5)
@@ -257,6 +253,9 @@ class PerTimestepAllChannels(object):
             # sets the y-ticks when using all frequencies in data
             yticks = np.arange(diff_bet_powers.shape[1], step=63)
             # yticklabels = [round(i,1) for i in np.logspace(np.log2(2),np.log2(150), num = len(yticks),base=2, dtype=np.float16)]
+
+        xticks = np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)
+        xticklabels = np.around(np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)/(20/time_resolution) - self.__event_delay, decimals=2)
 
         fig, axs = plt.subplots(2, 2,figsize=(24, 20))
         
@@ -278,7 +277,7 @@ class PerTimestepAllChannels(object):
         ax.set_ylabel('Mean LDA Score')
 
         # Plots the LDA coefficients for each frequency band over time
-        sns.heatmap(lda_coef.T, ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
+        sns.heatmap(np.abs(lda_coef.T), ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
         axs[1][1].set_title('LDA coefficient values for all frequencies')
         axs[1][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
@@ -296,3 +295,49 @@ class PerTimestepAllChannels(object):
 
         plt.savefig(out_path + '_heatmap_per_timestep_all_channels')
         plt.show()
+
+    def plot_contributing_channels(self, alpha):
+        num_freqs = self.__estimator.num_freqs
+        time_resolution = self.__estimator.time_resolution
+        rescaled_timesteps = self.__estimator.rescaled_timesteps
+
+        if rescaled_timesteps >= 50:
+            num_xticks = int(rescaled_timesteps/2)
+        else:
+            num_xticks = rescaled_timesteps
+        
+        yticks = np.arange(num_freqs)
+        yticklabels = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+
+        xticks = np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)
+        xticklabels = np.around(np.linspace(0, rescaled_timesteps - 1, num=num_xticks, dtype=np.int_)/(20/time_resolution) - self.__event_delay, decimals=2)
+
+
+        avg_coefs = np.abs(self.__estimator.lda_coefs).mean(0)
+        idxs = []
+
+        for i in avg_coefs.argsort()[::-1]:
+            if avg_coefs[i] > alpha:
+                idxs.append(i)
+            else:
+                break
+        
+        channels = [int(i/self.__estimator.num_freqs) for i in idxs]
+
+        fig, axs = plt.subplots(len(idxs), 1, figsize=(12,7*len(idxs)))
+
+        for i, ch in enumerate(channels):
+            ch_idx = ch*self.__estimator.num_freqs
+            sns.heatmap(np.abs(self.__estimator.lda_coefs.T[ch_idx:ch_idx+self.__estimator.num_freqs]), ax=axs[i], cmap='PRGn')
+
+            axs[i].set_xticks(xticks, labels = xticklabels, rotation = 90)
+            axs[i].set_xlabel('Time (seconds)')
+            axs[i].set_yticklabels(yticklabels, rotation = 0)
+            axs[i].set_ylabel('Frequency Band')
+            axs[i].axes.invert_yaxis()
+            axs[i].axvline(self.sorted_mean_scores[0,0], color = 'red', alpha=0.5)
+            axs[i].axvline(12, color = 'blue', alpha=1, ls = '--')
+            axs[i].set_title('Electrode %s in the %s \n LDA Coefficients' %(self.__estimator.elec_names[ch], self.__estimator.elec_areas[ch]))
+
+        plt.tight_layout()
+
