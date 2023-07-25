@@ -3,6 +3,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 
 class PerChannelTimestep(object):
+    """Visualizes model performance for LDA models trained on each channel and timestep of the data."""
 
     def __init__(
         self,
@@ -14,7 +15,7 @@ class PerChannelTimestep(object):
         self._sort_scores(filter_channels)
 
     def _sort_scores(self, filter_channels:bool):
-
+        """Sort channels from greatest to least maximum LDA scores, and indicate timepoint at which maximum LDA score occurs."""
         max_mean_scores = np.zeros((self.__estimator.num_channels,3))
 
         for channel in range(self.__estimator.num_channels):
@@ -36,6 +37,7 @@ class PerChannelTimestep(object):
             self.sorted_elec_areas = [self.__estimator.elec_areas[i] for i in sorted_indices]
 
     def plot_sorted_scores(self, out_path:str):
+        """Visualize the LDA model scores (sorted from greatest to least) for all channels."""
         num_channels = len(self.sorted_max_mean_scores)
         
         fig, axs = plt.subplots(3, 1, figsize=(24,24), gridspec_kw={'height_ratios' : [1,1,1]})
@@ -72,6 +74,7 @@ class PerChannelTimestep(object):
         plt.savefig(out_path + f'_sorted_scores_hline')
     
     def plot_sorted_scores_per_channel(self, num_plots:int, out_path:str):
+        """Visualize the LDA model scores over time for top performing channels."""
         time_resolution = self.__estimator.time_resolution
         rescaled_timesteps = self.__estimator.rescaled_timesteps
         
@@ -96,6 +99,7 @@ class PerChannelTimestep(object):
         plt.show()
 
     def plot_power_heatmap(self, plot_metric, num_plots:int, out_path:str):
+        """Plot heatmaps of high/low frequency powers, difference in high/low frequency powers, and LDA coefficients."""
         num_freqs = self.__estimator.num_freqs
         time_resolution = self.__estimator.time_resolution
         rescaled_timesteps = self.__estimator.rescaled_timesteps
@@ -181,6 +185,8 @@ class PerChannelTimestep(object):
 
 class PerTimestepAllChannels(object):
 
+    """Visualizes model performance for LDA models trained on all channels at each timestep of the data."""
+
     def __init__(
         self,
         estimator
@@ -191,17 +197,20 @@ class PerTimestepAllChannels(object):
         self._convert_timesteps_to_time(3)
         
     def _sort_scores(self):
-
+        """Sort the LDA scores from greatest to least, with indexes of channels saved."""
         enumerated_mean_scores = np.array(list(enumerate(self.__estimator.mean_scores.flatten())))
         sorted_indices = enumerated_mean_scores[:,1].argsort()[::-1]
         self.sorted_mean_scores = enumerated_mean_scores[sorted_indices]
 
     def _convert_timesteps_to_time(self, event_delay):
+        """Convert timesteps into seconds while specifying timepoint 0."""
         self.__event_delay = event_delay
-        self.__times = (np.arange(0, self.__estimator.rescaled_timesteps) / (20/self.__estimator.time_resolution)) - event_delay # time 0 seconds denotes when the subject starts moving (i.e. 3 seconds into the data)
+        # time point "0 seconds" denoted by event_delay
+        self.__times = (np.arange(0, self.__estimator.rescaled_timesteps) / (20/self.__estimator.time_resolution)) - event_delay 
 
     
     def plot_sorted_scores(self, out_path:str):
+        """Visualize the LDA model scores (sorted from greatest to least) for all timepoints."""
         num_timesteps = self.__estimator.rescaled_timesteps
         xticks = np.arange(0,num_timesteps,1)
         
@@ -231,7 +240,7 @@ class PerTimestepAllChannels(object):
         fig.savefig(out_path + '_sorted_scores_per_timestep_all_channels')
     
     def plot_power_heatmap(self, out_path:str):
-
+        """Plot heatmaps of high/low frequency powers, difference in high/low frequency powers, and LDA coefficients."""
         num_freqs = self.__estimator.num_freqs
         time_resolution = self.__estimator.time_resolution
         rescaled_timesteps = self.__estimator.rescaled_timesteps
@@ -261,31 +270,32 @@ class PerTimestepAllChannels(object):
         
         # Plot power per frequency as a function of time, power averaged across all respective trials (high or low bet trials) 
         sns.heatmap(high_bet_powers.T, ax=axs[0][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
-        axs[0][0].set_title('High Bet Z-Scored Frequency Power (n = %s)' %("~"))
-        axs[0][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
+        axs[0][0].set_title('High Bet Z-Scored Frequency Power')
+        # axs[0][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         sns.heatmap(low_bet_powers.T, ax=axs[0][1], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
-        axs[0][1].set_title('Low Bet Z-Scored Frequency Power (n = %s)' %("~"))
-        axs[0][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
+        axs[0][1].set_title('Low Bet Z-Scored Frequency Power')
+        # axs[0][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         # Plots the difference in power frequency for high and low bet trials
         sns.heatmap(diff_bet_powers.T, ax=axs[1][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power", "pad": 0.1}, cmap='PRGn')
         axs[1][0].set_title('Difference in Z-Scored Frequency Power (High - Low Bet)')
-        axs[1][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
+        # axs[1][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
         ax = axs[1][0].twinx()
         sns.lineplot(x=np.arange(0,rescaled_timesteps), y=self.__estimator.mean_scores.flatten(), color='blue', ax=ax) # Make the overlayed metric an optional variable user can select
         ax.set_ylabel('Mean LDA Score')
 
         # Plots the LDA coefficients for each frequency band over time
-        sns.heatmap(np.abs(lda_coef.T), ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
-        axs[1][1].set_title('LDA coefficient values for all frequencies')
-        axs[1][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
+        sns.heatmap(lda_coef.T, ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
+        axs[1][1].set_title('LDA coefficient values (on channels and frequencies)')
+        # axs[1][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         for axs_ in axs:
             for ax in axs_:
                 ax.set_xticks(xticks, labels = xticklabels, rotation = 90)
                 ax.set_yticks(yticks)
         #        ax.set_yticklabels(yticklabels, rotation = 0)
+                ax.set(xlabel="Time (seconds)", ylabel="Frequency Bands * Channels")
                 ax.axes.invert_yaxis()
                 ax.axvline(self.sorted_mean_scores[0,0], color = 'red', alpha=0.5)
                 ax.axvline(12, color = 'blue', alpha=1, ls = '--')
@@ -297,6 +307,7 @@ class PerTimestepAllChannels(object):
         plt.show()
 
     def plot_contributing_channels(self, alpha):
+        """Visualize the heatmap of the LDA coefficients for top channels with mean LDA coefficient absolute values greater than alpha."""
         num_freqs = self.__estimator.num_freqs
         time_resolution = self.__estimator.time_resolution
         rescaled_timesteps = self.__estimator.rescaled_timesteps
@@ -328,7 +339,7 @@ class PerTimestepAllChannels(object):
 
         for i, ch in enumerate(channels):
             ch_idx = ch*self.__estimator.num_freqs
-            sns.heatmap(np.abs(self.__estimator.lda_coefs.T[ch_idx:ch_idx+self.__estimator.num_freqs]), ax=axs[i], cmap='PRGn')
+            sns.heatmap(self.__estimator.lda_coefs.T[ch_idx:ch_idx+self.__estimator.num_freqs], ax=axs[i], cmap='PRGn')
 
             axs[i].set_xticks(xticks, labels = xticklabels, rotation = 90)
             axs[i].set_xlabel('Time (seconds)')
@@ -340,4 +351,3 @@ class PerTimestepAllChannels(object):
             axs[i].set_title('Electrode %s in the %s \n LDA Coefficients' %(self.__estimator.elec_names[ch], self.__estimator.elec_areas[ch]))
 
         plt.tight_layout()
-
