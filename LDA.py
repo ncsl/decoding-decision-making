@@ -3,9 +3,26 @@ from sklearn.model_selection import RepeatedKFold
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from scipy.stats import ttest_1samp
 
+from multiprocessing import Pool
+
+def _generate_sampled_channels(channels, sample_size, sampled_channels_=[]):
+    """Recursively generate a list (size = sample_size) of lists of sampled channels"""
+    np.random.seed()
+
+    if len(channels) > sample_size:
+        sample = np.random.choice(channels, size=sample_size, replace=False)
+        sampled_channels_.append(list(sample))
+        channels = np.delete(channels, np.where(np.isin(channels, sample))[0])
+        _generate_sampled_channels(channels, sample_size, sampled_channels_)
+    else:
+        sampled_channels_.append(list(channels))
+
+    return sampled_channels_
+
 class LDA(object):
     def __init__(
-            self
+            self,
+            setup_data
             ):
         self.mean_scores = []
         self.std_scores = []
@@ -16,6 +33,9 @@ class LDA(object):
         self.high_bet_avg_powers = []
         self.diff_avg_powers = []
         self.lda_coefs = []
+
+        self.__elec_areas = setup_data['elec_area']
+        self.__elec_names = setup_data['elec_name']
 
     @property
     def num_trials(self):
@@ -48,27 +68,80 @@ class LDA(object):
     @property
     def elec_names(self):
         return self.__elec_names
+    
+    @property
+    def optimal_time_windows_per_channel(self):
+        if self.__optimal_time_windows_per_channel == None:
+            raise Exception('No optimal time windows have been computed yet')
+        return self.__optimal_time_windows_per_channel
+
+    def _create_time_windows(self):
+        """Create all possible time windows from which X data can be created."""
+        time_windows = []
+        for i in range(self.__num_timesteps):
+            for j in range(self.__num_timesteps):
+                if i-j >= 0 and i+j <= self.__num_timesteps:
+                    time_windows.append([i-j,i+j])
+                else:
+                    break
+        
+        return time_windows
 
     def _create_X(self, data, channel, time):
         """Create the X data that will be used to train the LDA model"""
         if type(time) == int:
             X = data[:, channel, :, time:time+self.__time_resolution].mean(-1)
+        elif type(time) == list and len(time) == 2:
+            if time[0] - time[1] == 0:
+                X = data[:, channel, :, time[0]]
+            else:
+                X = data[:, channel, :, time[0]:time[1]].mean(-1)
         else:
-            X = data[:, channel, :, time]
+            pass
 
         return X
-    
+
+    def _filter_channels(self):
+        """Filters out channels that are in particular anatomical locations"""
+        self._filtered_elec_areas_idxs = [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
+        temp = [self.__elec_areas[i] for i in self._filtered_elec_areas_idxs]
+        self.__elec_areas = temp
+
+    def _multiprocessing_time_window_grid_search(self, data, y, n_processes):
+        """Perform a time window grid search in parallel"""
+        self._set_attributes(data)
+
+        channels = np.arange(self.__num_channels)
+        sample_size = round(len(channels)/n_processes)
+
+        sampled_channels = _generate_sampled_channels(channels, sample_size, [])
+
+        if __name__ == '__main__':
+            with Pool(n_processes) as p:
+                results = p.starmap(self._time_window_grid_search, [(data, y, channels) for channels in sampled_channels])
+                p.close()
+        
+        return results
+
     def _reshape_attributes(self, new_shape:tuple):
         """Reshape class attributes to specified shape"""
         for attr_name in self.__dict__.keys():
             if not attr_name.startswith('_'):
                 setattr(self, attr_name, np.reshape(getattr(self, attr_name), new_shape))
+        
+    def _reset_attributes(self):
+        self.mean_scores = []
+        self.std_scores = []
+        self.dvals = []
+        self.t_stats = []
+        self.p_vals = []
+        self.low_bet_avg_powers = []
+        self.high_bet_avg_powers = []
+        self.diff_avg_powers = []
+        self.lda_coefs = []
 
-    def _set_attributes(self, data, setup_data, **kwargs):
+    def _set_attributes(self, data, **kwargs):
         """Set class attributes specified by the dataset and metadata"""
-        self.__elec_areas = setup_data['elec_area']
-        self.__elec_names = setup_data['elec_name']
-
         self.__num_trials, self.__num_channels, self.__num_freqs, self.__num_timesteps = data.shape
 
         if 'time_resolution' in kwargs:
@@ -77,13 +150,24 @@ class LDA(object):
             else:
                 self.__time_resolution = kwargs['time_resolution']
                 self.__rescaled_timesteps = int(self.__num_timesteps/kwargs['time_resolution'])
-
-    def _filter_channels(self):
-        """Filters out channels that are in particular anatomical locations"""
-        self._filtered_elec_areas_idxs = [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
-        temp = [self.__elec_areas[i] for i in self._filtered_elec_areas_idxs]
-        self.__elec_areas = temp
     
+    def _time_window_grid_search(self, data, y, channels):
+        """Train LDA model on all possible time windows, store the time windows that correspond with the highest LDA score."""
+        self._set_attributes(data)
+        time_windows = self._create_time_windows()
+        best_time_windows = []
+
+        for channel in channels:
+            for times in time_windows:
+                X = self._create_X(data, channel, times)
+                self._train(X,y)
+
+            print(f'Channel {channel} done')
+            best_time_windows.append([channel, time_windows[np.argmax(self.mean_scores)], np.max(self.mean_scores)])
+            self._reset_attributes()
+        
+        return best_time_windows
+
     def _train(self, X, y):
         """Train LDA model on specified X data and y labels"""
         low_bet_avg_powers = X[np.where(y == 0)].mean(0)
@@ -114,6 +198,7 @@ class LDA(object):
         self.std_scores.append(np.std(scores))
 
         t_stat, p_val = ttest_1samp(dval, popmean=0) # perform 1-sided t-test on decision values corresponding to high bet
+        
         self.t_stats.append(t_stat)
         self.p_vals.append(p_val)
 
@@ -157,9 +242,27 @@ class LDA(object):
         
         return t_stat_sums
 
-    def train_per_channel_and_timestep(self, data, y, setup_data, time_resolution):
+    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10):
+        """Train LDA model on the optimal time windows for each channel"""
+        self._set_attributes(data)
+        results = self._multiprocessing_time_window_grid_search(data, y, n_processes)
+
+        # Unravel the results from the multiprocessing and sort them by channels
+        optimal_time_windows_per_channel = [item for sublist in results for item in sublist]
+        optimal_time_windows_per_channel.sort(key=lambda x: x[0])
+        optimal_time_windows_per_channel.sort(key=lambda x: x[2], reverse=True)
+        self.__optimal_time_windows_per_channel = optimal_time_windows_per_channel
+
+        for channel, times, _ in optimal_time_windows_per_channel[:n_channels]:
+            X = self._create_X(data, channel, times)
+            self._train(X,y)
+        
+        self._reshape_attributes((n_channels,-1))
+
+
+    def train_per_channel_and_timestep(self, data, y, time_resolution):
         """Train an LDA model on each channel and timestep"""
-        self._set_attributes(data, setup_data, time_resolution=time_resolution)
+        self._set_attributes(data, time_resolution=time_resolution)
 
         for channel in range(self.__num_channels):
             for time in range(self.__rescaled_timesteps):
@@ -168,9 +271,9 @@ class LDA(object):
 
         self._reshape_attributes((self.__num_channels,self.__rescaled_timesteps,-1))
 
-    def train_on_all_channels(self, data, y, setup_data, time_resolution, filter_channels:bool = False, custom_channels = None):
+    def train_on_all_channels(self, data, y, time_resolution, filter_channels:bool = False, custom_channels = None):
         """Train an LDA model on all the channels for each timestep"""
-        self._set_attributes(data, setup_data, time_resolution=time_resolution)
+        self._set_attributes(data, time_resolution=time_resolution)
 
         for time in range(self.__rescaled_timesteps):
             if filter_channels:
