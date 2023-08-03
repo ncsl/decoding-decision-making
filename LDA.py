@@ -103,15 +103,19 @@ class LDA(object):
 
     def _filter_channels(self):
         """Filters out channels that are in particular anatomical locations"""
-        self._filtered_elec_areas_idxs = [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
-        temp = [self.__elec_areas[i] for i in self._filtered_elec_areas_idxs]
-        self.__elec_areas = temp
+        self.__filtered_elec_areas_idxs = [i for i,ea in enumerate(self.__elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
+        self.__filtered_elec_areas = [self.__elec_areas[i] for i in self.__filtered_elec_areas_idxs]
 
-    def _multiprocessing_time_window_grid_search(self, data, y, n_processes):
+    def _multiprocessing_time_window_grid_search(self, data, y, n_processes, filter_channels:bool = True):
         """Perform a time window grid search in parallel"""
         self._set_attributes(data)
 
-        channels = np.arange(self.__num_channels)
+        if filter_channels:
+            self._filter_channels()
+            channels = self.__filtered_elec_areas_idxs
+        else:
+            channels = np.arange(self.__num_channels)
+
         sample_size = round(len(channels)/n_processes)
 
         sampled_channels = _generate_sampled_channels(channels, sample_size, [])
@@ -242,10 +246,10 @@ class LDA(object):
         
         return t_stat_sums
 
-    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10):
-        """Train LDA model on the optimal time windows for each channel"""
+    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10, filter_channels:bool=True):
+        """Train LDA model on the optimal time windows for top performing channels, specified by n_channels"""
         self._set_attributes(data)
-        results = self._multiprocessing_time_window_grid_search(data, y, n_processes)
+        results = self._multiprocessing_time_window_grid_search(data, y, n_processes, filter_channels=filter_channels)
 
         # Unravel the results from the multiprocessing and sort them by channels
         optimal_time_windows_per_channel = [item for sublist in results for item in sublist]
