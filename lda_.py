@@ -456,15 +456,6 @@ class PerChannelTimestep(LDA):
             axs[0][1].set_title('Electrode %s in the %s \n Low Bet Z-Scored Frequency Power (n = %s)' %(self.sorted_elec_names[i], self.sorted_elec_areas[i], "~"))
             axs[0][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
-            # Plot power per frequency at a particular timestep for each respective trial (high or low bet trials)
-            # sns.heatmap(low_bet_powers[int(time)].T, ax=axs[0][0], vmin=-3, vmax=3, cbar_kws={"label": "Frequency Power"}, cmap='PRGn')
-            # axs[0][0].set_title('Electrode %s in the %s at time %s \n Low Bet Frequency Power' %(elec_names[i], elec_areas[i], round(time/(20/time_resolution) - 3,2)))
-            # axs[0][0].set(xlabel="Trial Indices", ylabel="Frequency (Hz)")
-
-            # sns.heatmap(high_bet_powers[int(time)].T, ax=axs[0][1], vmin=-3, vmax=3, cbar_kws={"label": "Frequency Power"}, cmap='PRGn')
-            # axs[0][1].set_title('Electrode %s in the %s at time %s \n High Bet Frequency Power' %(elec_names[i], elec_areas[i], round(time/(20/time_resolution) - 3,2)))
-            # axs[0][1].set(xlabel="Trial Indices", ylabel="Frequency (Hz)")
-
             # Plots the difference in power frequency for high and low bet trials
             sns.heatmap(diff_bet_powers.T, ax=axs[1][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power", "pad": 0.1}, cmap='PRGn')
             axs[1][0].set_title('Electrode %s in the %s \n Difference in Z-Scored Frequency Power (High - Low Bet)' %(self.sorted_elec_names[i], self.sorted_elec_areas[i]))
