@@ -24,7 +24,13 @@ def _generate_sampled_channels(channels, sample_size, sampled_channels_=[]):
     return sampled_channels_
 
 def _find_combinations(n, k):
-    # Find all the different combinations of k channels
+    """Find all possible combinations of k channels from n channels
+
+    Return
+    ------
+    combinations_list : list
+        List of tuples containing the indices all possible combinations of k channels from n channels
+    """
     population = list(range(0, n))
     combinations_list = list(itertools.combinations(population, k))
     return combinations_list
@@ -178,13 +184,15 @@ class TrainOptimalTimeWindows(LDA):
 
         return predictions
     
-    def _grid_search_on_channel_combinations(self, y):
+    def _grid_search_on_channel_combinations(self, y, max_channels=20):
+        assert max_channels <= 20, 'Cannot perform grid search on more than 20 channels'
+
         predictions = self._get_predictions()
             # Find all possible channel combinations to use for collective prediction
         all_channel_idxs_combinations = []
-        for i in range(predictions.shape[1]):
+        for i in range(max_channels):
             # Find all possible channel combinations of length i+1
-            channel_combinations = _find_combinations(predictions.shape[1], i+1)
+            channel_combinations = _find_combinations(max_channels, i+1)
             all_channel_idxs_combinations.append(channel_combinations)
 
         # Grid search on optimal channel combination to use for collective prediction
@@ -259,8 +267,12 @@ class TrainOptimalTimeWindows(LDA):
         
         super()._reshape_attributes((n_channels,-1))
 
-    def get_optimal_channel_combination(self, y):
-        all_channel_idxs_combinations, accuracies = self._grid_search_on_channel_combinations(y)
+    def get_optimal_channel_combination(self, y, max_channels=20):
+        """
+        Get the optimal channel combination to use for collective prediction. 
+        Channels used to find combination is specified by max_channels."""
+
+        all_channel_idxs_combinations, accuracies = self._grid_search_on_channel_combinations(y, max_channels=max_channels)
 
         optimal_time_windows_per_ch = self._optimal_time_windows_per_channel
         max_accuracies = []
@@ -286,23 +298,25 @@ class TrainOptimalTimeWindows(LDA):
             collective_predictions = _get_collective_predictions(predictions[:,:i+1])
             accuracies.append(_get_collective_prediction_accuracy(collective_predictions, y))
         
+        peak_accuracy_group_idx = np.argmax(accuracies)
+
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         ax.plot(accuracies)
+        ax.set_title('Accuracy of Majority Concensus')
+        ax.set_ylabel('Accuracy')
+        ax.set_xlabel('Number of Top Performing Channels in Group')
+        ax.axvline(peak_accuracy_group_idx, color = 'red', alpha=0.5)
+        ax.annotate(f'(Group Size for Peak Aaccuracy: {peak_accuracy_group_idx + 1} Score: {accuracies[peak_accuracy_group_idx]})', xy=(peak_accuracy_group_idx,np.mean(accuracies)), fontsize = 12)
 
 class PerChannelTimestep(LDA):
     """Visualizes model performance for LDA models trained on each channel and timestep of the data."""
 
     def __init__(
         self,
-        setup_data,
         data,
-        y,
-        time_resolution,
-        filter_channels = False
+        setup_data
         ) :
         super().__init__(data, setup_data)
-        self.train_per_channel_and_timestep(data, y, time_resolution)
-        self._sort_scores(self.filter_channels)
 
     def _sort_scores(self, filter_channels:bool):
         """Sort channels from greatest to least maximum LDA scores, and indicate timepoint at which maximum LDA score occurs."""
@@ -326,7 +340,7 @@ class PerChannelTimestep(LDA):
             self.sorted_elec_names = [self._elec_names[i] for i in sorted_indices]
             self.sorted_elec_areas = [self._elec_areas[i] for i in sorted_indices]
 
-    def train_per_channel_and_timestep(self, data, y, time_resolution):
+    def train_per_channel_and_timestep(self, data, y, time_resolution, filter_channels:bool = True):
         """Train an LDA model on each channel and timestep"""
         super().set_attributes(time_resolution=time_resolution)
 
@@ -336,6 +350,7 @@ class PerChannelTimestep(LDA):
                 super().train(X, y)
 
         super()._reshape_attributes((self._num_channels,self._timesteps_rescaled,-1))
+        self._sort_scores(filter_channels)
 
     def plot_sorted_scores(self, out_path:str):
         """Visualize the LDA model scores (sorted from greatest to least) for all channels."""
@@ -436,12 +451,10 @@ class PerChannelTimestep(LDA):
             sns.heatmap(high_bet_powers.T, ax=axs[0][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
             axs[0][0].set_title('Electrode %s in the %s \n High Bet Z-Scored Frequency Power (n = %s)' %(self.sorted_elec_names[i], self.sorted_elec_areas[i], "~"))
             axs[0][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
-            # axs[0][0].set_xticks(xticks, labels = xticklabels)
 
             sns.heatmap(low_bet_powers.T, ax=axs[0][1], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
             axs[0][1].set_title('Electrode %s in the %s \n Low Bet Z-Scored Frequency Power (n = %s)' %(self.sorted_elec_names[i], self.sorted_elec_areas[i], "~"))
             axs[0][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
-            # axs[0][1].set_xticks(xticks, labels = xticklabels)
 
             # Plot power per frequency at a particular timestep for each respective trial (high or low bet trials)
             # sns.heatmap(low_bet_powers[int(time)].T, ax=axs[0][0], vmin=-3, vmax=3, cbar_kws={"label": "Frequency Power"}, cmap='PRGn')
@@ -456,7 +469,6 @@ class PerChannelTimestep(LDA):
             sns.heatmap(diff_bet_powers.T, ax=axs[1][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power", "pad": 0.1}, cmap='PRGn')
             axs[1][0].set_title('Electrode %s in the %s \n Difference in Z-Scored Frequency Power (High - Low Bet)' %(self.sorted_elec_names[i], self.sorted_elec_areas[i]))
             axs[1][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
-            # axs[1][0].set_xticks(xticks, labels = xticklabels)
             ax = axs[1][0].twinx()
             sns.lineplot(x=np.arange(0,timesteps_rescaled), y=plot_metric[int(channel)].flatten(), color='blue', ax=ax) # Make the overlayed metric an optional variable user can select
             ax.set_ylabel('Mean LDA Score')
@@ -467,7 +479,6 @@ class PerChannelTimestep(LDA):
             sns.heatmap(lda_coef.T, ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
             axs[1][1].set_title('LDA coefficient values for all frequencies \n at %s in %s' %(self.sorted_elec_names[i], self.sorted_elec_areas[i]))
             axs[1][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
-            # axs[1][1].set_xticks(xticks, labels = xticklabels)
 
             for axs_ in axs:
                 for ax in axs_:
@@ -490,11 +501,10 @@ class PerTimestepAllChannels(LDA):
 
     def __init__(
         self,
+        data,
+        setup_data
         ) :
-        super().__init__()
-
-        self._sort_scores()
-        self._convert_timesteps_to_time(3)
+        super().__init__(data, setup_data)
         
     def _sort_scores(self):
         """Sort the LDA scores from greatest to least, with indexes of channels saved."""
@@ -571,16 +581,13 @@ class PerTimestepAllChannels(LDA):
         # Plot power per frequency as a function of time, power averaged across all respective trials (high or low bet trials) 
         sns.heatmap(high_bet_powers.T, ax=axs[0][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
         axs[0][0].set_title('High Bet Z-Scored Frequency Power')
-        # axs[0][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         sns.heatmap(low_bet_powers.T, ax=axs[0][1], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
         axs[0][1].set_title('Low Bet Z-Scored Frequency Power')
-        # axs[0][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         # Plots the difference in power frequency for high and low bet trials
         sns.heatmap(diff_bet_powers.T, ax=axs[1][0], vmin=-.4, vmax=.4, cbar_kws={"label": "Z-Scored Frequency Power", "pad": 0.1}, cmap='PRGn')
         axs[1][0].set_title('Difference in Z-Scored Frequency Power (High - Low Bet)')
-        # axs[1][0].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
         ax = axs[1][0].twinx()
         sns.lineplot(x=np.arange(0,timesteps_rescaled), y=self.mean_scores.flatten(), color='blue', ax=ax) # Make the overlayed metric an optional variable user can select
         ax.set_ylabel('Mean LDA Score')
@@ -588,13 +595,11 @@ class PerTimestepAllChannels(LDA):
         # Plots the LDA coefficients for each frequency band over time
         sns.heatmap(lda_coef.T, ax=axs[1][1], vmin=-1, vmax=1, cbar_kws={"label": "Z-Scored Frequency Power"}, cmap='PRGn')
         axs[1][1].set_title('LDA coefficient values (on channels and frequencies)')
-        # axs[1][1].set(xlabel="Time (sec)", ylabel="Frequency (Hz)")
 
         for axs_ in axs:
             for ax in axs_:
                 ax.set_xticks(xticks, labels = xticklabels, rotation = 90)
                 ax.set_yticks(yticks)
-        #        ax.set_yticklabels(yticklabels, rotation = 0)
                 ax.set(xlabel="Time (seconds)", ylabel="Frequency Bands * Channels")
                 ax.axes.invert_yaxis()
                 ax.axvline(self.sorted_mean_scores[0,0], color = 'red', alpha=0.5)
@@ -652,7 +657,7 @@ class PerTimestepAllChannels(LDA):
 
         plt.tight_layout()
 
-    def train_on_all_channels(self, data, y, time_resolution, filter_channels:bool = False, custom_channels = None):
+    def train_on_all_channels(self, data, y, time_resolution, filter_channels:bool = True, custom_channels = None):
         """Train an LDA model on all the channels for each timestep"""
         super().set_attributes(time_resolution=time_resolution)
 
@@ -669,6 +674,8 @@ class PerTimestepAllChannels(LDA):
             super().train(X_reshaped,y)
         
         super()._reshape_attributes((self._timesteps_rescaled,-1))
+        self._sort_scores()
+        self._convert_timesteps_to_time(3)
 
 class AllTimesteps(LDA):
     def train_on_all_timesteps(self, data, y):
