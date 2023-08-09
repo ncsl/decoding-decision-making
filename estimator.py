@@ -21,7 +21,9 @@ class Estimator(object):
     
     def filter_channels(self):
         """Filters out channels that are in particular anatomical locations"""
-        filtered_elec_areas_idxs = [i for i,ea in enumerate(self._elec_areas) if ea not in ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid','lesion L','ventricle L','ventricle R']]
+        filtered_elec_areas_idxs = [i for i,ea in enumerate(self._elec_areas) if ea not in 
+                                    ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid',
+                                     'lesion L','ventricle L','ventricle R']]
         filtered_elec_areas = [self._elec_areas[i] for i in filtered_elec_areas_idxs]
         filtered_num_channels = len(filtered_elec_areas_idxs)
 

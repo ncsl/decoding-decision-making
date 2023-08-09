@@ -235,7 +235,7 @@ class TrainOptimalTimeWindows(LDA):
     def _multiprocessing_time_window_grid_search(self, data, y, n_processes, filter_channels:bool = True):
         """Perform a time window grid search in parallel"""
         if filter_channels:
-            filtered_elec_areas_idxs, filtered_elec_areas, filtered_num_channels = super().filter_channels()
+            filtered_elec_areas_idxs, _, __ = super().filter_channels()
             channels = filtered_elec_areas_idxs
         else:
             channels = np.arange(self._num_channels)
@@ -267,10 +267,25 @@ class TrainOptimalTimeWindows(LDA):
         
         super()._reshape_attributes((n_channels,-1))
 
+    def get_group_accuracies(self, y):
+        """Get all the collective prediction accuracies of top channels for all group sizes"""
+        predictions = self._get_predictions()
+        accuracies = []
+
+        for i in range(predictions.shape[1]):
+            # Get collective prediction of channels 0 to i
+            collective_predictions = _get_collective_predictions(predictions[:,:i+1])
+            accuracies.append(_get_collective_prediction_accuracy(collective_predictions, y))
+        
+        peak_accuracy_group_idx = np.argmax(accuracies)
+
+        return accuracies, peak_accuracy_group_idx
+
     def get_optimal_channel_combination(self, y, max_channels=20):
         """
         Get the optimal channel combination to use for collective prediction. 
-        Channels used to find combination is specified by max_channels."""
+        Channels used to find combination is specified by max_channels.
+        """
 
         all_channel_idxs_combinations, accuracies = self._grid_search_on_channel_combinations(y, max_channels=max_channels)
 
@@ -289,25 +304,80 @@ class TrainOptimalTimeWindows(LDA):
 
         return max_accuracies
     
-    def plot_accuracies(self, y):
-        predictions = self._get_predictions()
-        accuracies = []
-
-        for i in range(predictions.shape[1]):
-            # Get collective prediction of channels 0 to i
-            collective_predictions = _get_collective_predictions(predictions[:,:i+1])
-            accuracies.append(_get_collective_prediction_accuracy(collective_predictions, y))
-        
-        peak_accuracy_group_idx = np.argmax(accuracies)
+    def plot_accuracies(self, y, out_path:str=None):
+        """Plot the collective prediction accuracy for each group size of top performing channels"""
+        accuracies, peak_accuracy_group_idx = self.get_group_accuracies(y)
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        ax.plot(accuracies)
+        ax.plot(np.arange(len(accuracies)) + 1, accuracies)
         ax.set_title('Accuracy of Majority Concensus')
         ax.set_ylabel('Accuracy')
         ax.set_xlabel('Number of Top Performing Channels in Group')
-        ax.axvline(peak_accuracy_group_idx, color = 'red', alpha=0.5)
-        ax.annotate(f'(Group Size for Peak Aaccuracy: {peak_accuracy_group_idx + 1} Score: {accuracies[peak_accuracy_group_idx]})', xy=(peak_accuracy_group_idx,np.mean(accuracies)), fontsize = 12)
+        ax.axvline(peak_accuracy_group_idx + 1, color = 'red', alpha=0.5)
+        ax.annotate(f'(Group Size for Peak Accuracy: {peak_accuracy_group_idx + 1}\nScore: {accuracies[peak_accuracy_group_idx]:.2f})', xy=(peak_accuracy_group_idx,np.mean(accuracies)), fontsize = 12)
 
+        plt.savefig(out_path + '_optimal_time_window_all_group_accuracies.png')
+        plt.show()
+
+    def plot_heatmap(self, channels:list, event_delay:int, top_accuracy:float = None, optimal_combination:bool=False, out_path:str=None):
+        """
+        Plot a heatmap of the accuracy of the selected channels for their respective time windows.
+        Heatmap is sorted by the accuracy of the time window.
+
+        Parameters
+        ----------
+        channels : list
+            List of channels idxs to plot
+        event_delay : int
+            How many seconds before event onset
+        """
+
+        # Convert the number of time steps to seconds
+        time = np.arange(self._num_timesteps)/20 - event_delay # 20 is the number of timesteps per second
+
+        channels_sorted_by_accuracy = [channel for channel, _, _ in self._optimal_time_windows_per_channel]
+        channel_idxs = []
+        accuracies = []
+
+        arr = np.zeros((len(channels),self._num_timesteps))
+
+        # Get the locations of the channels from the data strucure
+        for channel in channels:
+            channel_idxs.append(channels_sorted_by_accuracy.index(channel))
+        
+        
+        for i, idxs in enumerate(channel_idxs):
+            time_window = self._optimal_time_windows_per_channel[idxs][1]
+            # If time_window is exactly at one timestep, visualize the time window to be one timestep larger
+            if time_window[0] - time_window[1] == 0:
+                time_window = [time_window[0], time_window[1]+1]
+            accuracies.append(self._optimal_time_windows_per_channel[idxs][2])
+            arr[i,time_window[0]:time_window[1]] = accuracies[i]
+
+        fig, axs = plt.subplots(1, 1, figsize=(10, 25))
+        sns.heatmap(arr, ax=axs, cmap='PRGn', vmin=np.min(accuracies)-.05, vmax=np.max(accuracies), center=np.min(accuracies)-.05, cbar_kws={"label":"Channel Accuracy"})
+        
+        if optimal_combination:
+            axs.set_title(f'Accuracy of Optimal Combination of Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
+            path = out_path + '_optimal_time_window_and_combination_heatmap.png'
+        else:
+            axs.set_title(f'Accuracy of Top {len(channels)} Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
+            path = out_path + '_optimal_time_window_heatmap.png'
+
+        
+        axs.set_ylabel('Channel')
+        axs.set_xlabel('Time (s)')
+        axs.set_xticks(np.arange(0, self._num_timesteps, 5))
+        axs.set_xticklabels(time[::5])
+        axs.set_yticks(np.arange(len(channels))+0.5)
+        axs.set_yticklabels(np.asarray(self._elec_areas)[channels], rotation = 0)
+        axs.axvline(np.where(time == 0), color = 'blue', alpha=1, ls = '--')
+
+        axs.tick_params(axis='y', pad=25)
+
+        plt.savefig(path, bbox_inches='tight')
+        plt.show()
+            
 class PerChannelTimestep(LDA):
     """Visualizes model performance for LDA models trained on each channel and timestep of the data."""
 
@@ -352,7 +422,7 @@ class PerChannelTimestep(LDA):
         super()._reshape_attributes((self._num_channels,self._timesteps_rescaled,-1))
         self._sort_scores(filter_channels)
 
-    def plot_sorted_scores(self, out_path:str):
+    def plot_sorted_scores(self, event_delay, out_path:str):
         """Visualize the LDA model scores (sorted from greatest to least) for all channels."""
         num_channels = len(self.sorted_max_mean_scores)
         
@@ -372,7 +442,7 @@ class PerChannelTimestep(LDA):
         axs[2].set_title('Time of Peak Score of LDA Models')
         axs[2].set_ylabel('Time (seconds)')
         axs[2].set_xlabel('Channels (from most to least accurate)')
-        time = self.sorted_max_mean_scores[:,1]/(20/self._time_resolution) - 3 # LOOKUP
+        time = self.sorted_max_mean_scores[:,1]/(20/self._time_resolution) - event_delay # LOOKUP
         axs[2].scatter(np.arange(0, num_channels), time)
         axs[2].axhline(y = 0, color = 'red', alpha=0.5)
 
