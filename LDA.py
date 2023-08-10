@@ -323,39 +323,40 @@ class TrainOptimalTimeWindows(LDA):
         """
         Plot a heatmap of the accuracy of the selected channels for their respective time windows.
         Heatmap is sorted by the accuracy of the time window.
-
-        Parameters
-        ----------
-        channels : list
-            List of channels idxs to plot
-        event_delay : int
-            How many seconds before event onset
         """
 
         # Convert the number of time steps to seconds
         time = np.arange(self._num_timesteps)/20 - event_delay # 20 is the number of timesteps per second
 
-        channels_sorted_by_accuracy = [channel for channel, _, _ in self._optimal_time_windows_per_channel]
-        channel_idxs = []
+        optimal_time_window_info_for_channels = []
+
+        for channel in channels:
+            optimal_time_window_info = [lst for lst in self._optimal_time_windows_per_channel if lst[0] == channel]
+            optimal_time_window_info_for_channels.append(optimal_time_window_info[0])
+
+        # Ensures that channels are sorted by the start time of their time windows
+        optimal_time_window_info_for_channels.sort(key=lambda x: x[1][1])
+        optimal_time_window_info_for_channels.sort(key=lambda x: x[1][0])
+
+        channels_sorted_by_time_window = [lst[0] for lst in optimal_time_window_info_for_channels]
+        print(channels_sorted_by_time_window)
+
         accuracies = []
 
-        arr = np.zeros((len(channels),self._num_timesteps))
+        heatmap_array = np.zeros((len(channels), self._num_timesteps))
 
         # Get the locations of the channels from the data strucure
-        for channel in channels:
-            channel_idxs.append(channels_sorted_by_accuracy.index(channel))
         
-        
-        for i, idxs in enumerate(channel_idxs):
-            time_window = self._optimal_time_windows_per_channel[idxs][1]
+        for i, (channel, time_window, accuracy) in enumerate(optimal_time_window_info_for_channels):
             # If time_window is exactly at one timestep, visualize the time window to be one timestep larger
             if time_window[0] - time_window[1] == 0:
                 time_window = [time_window[0], time_window[1]+1]
-            accuracies.append(self._optimal_time_windows_per_channel[idxs][2])
-            arr[i,time_window[0]:time_window[1]] = accuracies[i]
+
+            heatmap_array[i,time_window[0]:time_window[1]] = accuracy
+            accuracies.append(accuracy)
 
         fig, axs = plt.subplots(1, 1, figsize=(10, 25))
-        sns.heatmap(arr, ax=axs, cmap='PRGn', vmin=np.min(accuracies)-.05, vmax=np.max(accuracies), center=np.min(accuracies)-.05, cbar_kws={"label":"Channel Accuracy"})
+        sns.heatmap(heatmap_array, ax=axs, cmap='PRGn', vmin=np.min(accuracies)-.05, vmax=np.max(accuracies), center=np.min(accuracies)-.05, cbar_kws={"label":"Channel Accuracy"})
         
         if optimal_combination:
             axs.set_title(f'Accuracy of Optimal Combination of Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
@@ -363,14 +364,13 @@ class TrainOptimalTimeWindows(LDA):
         else:
             axs.set_title(f'Accuracy of Top {len(channels)} Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
             path = out_path + '_optimal_time_window_heatmap.png'
-
         
         axs.set_ylabel('Channel')
         axs.set_xlabel('Time (s)')
         axs.set_xticks(np.arange(0, self._num_timesteps, 5))
         axs.set_xticklabels(time[::5])
         axs.set_yticks(np.arange(len(channels))+0.5)
-        axs.set_yticklabels(np.asarray(self._elec_areas)[channels], rotation = 0)
+        axs.set_yticklabels(np.asarray(self._elec_areas)[channels_sorted_by_time_window], rotation = 0)
         axs.axvline(np.where(time == 0), color = 'blue', alpha=1, ls = '--')
 
         axs.tick_params(axis='y', pad=25)
