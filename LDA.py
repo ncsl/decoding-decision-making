@@ -328,7 +328,7 @@ class TrainOptimalTimeWindows(LDA):
         axs.set_xticklabels(time[::5])
         axs.set_yticks(np.arange(len(channels))+0.5)
         axs.set_yticklabels(np.asarray(self._elec_areas)[channels_sorted_by_time_window], rotation = 0)
-        axs.axvline(np.where(time == 0), color = 'blue', alpha=1, ls = '--')
+        axs.axvline(np.argmin(np.abs(time)) + 1, color = 'blue', alpha=1, ls = '--')
 
         axs.tick_params(axis='y', pad=25)
 

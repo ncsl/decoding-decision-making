@@ -46,7 +46,7 @@ class LogisticReg(Estimator):
         dval = np.zeros(self._num_trials)
 
         for train, test in rkf.split(X):
-            clf = LogisticRegression(random_state=0).fit(X[train], y[train])
+            clf = LogisticRegression(random_state=42).fit(X[train], y[train])
             estimators.append(clf)
             scores.append(clf.score(X[test], y[test]))
             dval[test] = np.dot(X[test], clf.coef_.T).T[0] + clf.intercept_
@@ -276,7 +276,7 @@ class TrainOptimalTimeWindows(LogisticReg):
         axs.set_xticklabels(time[::5])
         axs.set_yticks(np.arange(len(channels))+0.5)
         axs.set_yticklabels(np.asarray(self._elec_areas)[channels_sorted_by_time_window], rotation = 0)
-        axs.axvline(np.where(time == 0), color = 'blue', alpha=1, ls = '--')
+        axs.axvline(np.argmin(np.abs(time)) + 1, color = 'blue', alpha=1, ls = '--')
 
         axs.tick_params(axis='y', pad=25)
 
