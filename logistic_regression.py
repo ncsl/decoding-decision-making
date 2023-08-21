@@ -6,6 +6,7 @@ from estimator import Estimator
 from helper_functions import _generate_sampled_channels, _find_combinations, _get_collective_predictions, _get_collective_prediction_accuracy
 import matplotlib.pyplot as plt
 import seaborn as sns
+import pandas as pd
 
 from sklearn.linear_model import LogisticRegression
 
@@ -18,8 +19,8 @@ class LogisticReg(Estimator):
     def _reset_metrics(self):
         self.mean_scores = []
         self.dvals = []
-        self.low_bet_avg_powers = []
-        self.high_bet_avg_powers = []
+        self.low_bet_powers = []
+        self.high_bet_powers = []
         self.diff_avg_powers = []
 
     def _reshape_attributes(self, new_shape:tuple):
@@ -29,12 +30,12 @@ class LogisticReg(Estimator):
                 setattr(self, attr_name, np.reshape(getattr(self, attr_name), new_shape))
 
     def train(self, X, y):
-        low_bet_avg_powers = X[np.where(y == 0)].mean(0)
-        high_bet_avg_powers = X[np.where(y == 1)].mean(0)
-        diff_avg_powers = high_bet_avg_powers - low_bet_avg_powers
+        low_bet_powers = X[np.where(y == 0)]
+        high_bet_powers = X[np.where(y == 1)]
+        diff_avg_powers = high_bet_powers.mean(0) - low_bet_powers.mean(0)
 
-        self.high_bet_avg_powers.append(high_bet_avg_powers)
-        self.low_bet_avg_powers.append(low_bet_avg_powers)
+        self.high_bet_powers.append(high_bet_powers)
+        self.low_bet_powers.append(low_bet_powers)
         self.diff_avg_powers.append(diff_avg_powers)
 
 
@@ -46,7 +47,7 @@ class LogisticReg(Estimator):
         dval = np.zeros(self._num_trials)
 
         for train, test in rkf.split(X):
-            clf = LogisticRegression(random_state=42).fit(X[train], y[train])
+            clf = LogisticRegression(random_state=0).fit(X[train], y[train])
             estimators.append(clf)
             scores.append(clf.score(X[test], y[test]))
             dval[test] = np.dot(X[test], clf.coef_.T).T[0] + clf.intercept_
@@ -156,22 +157,6 @@ class TrainOptimalTimeWindows(LogisticReg):
         
         return results
 
-    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10, filter_channels:bool=True):
-        """Train LDA model on the optimal time windows for top performing channels, specified by n_channels"""
-        results = self._multiprocessing_time_window_grid_search(data, y, n_processes, filter_channels=filter_channels)
-
-        # Unravel the results from the multiprocessing and sort them by channels
-        optimal_time_windows_per_channel = [item for sublist in results for item in sublist]
-        optimal_time_windows_per_channel.sort(key=lambda x: x[0])
-        optimal_time_windows_per_channel.sort(key=lambda x: x[2], reverse=True)
-        self._optimal_time_windows_per_channel = optimal_time_windows_per_channel
-
-        for channel, times, _ in optimal_time_windows_per_channel[:n_channels]:
-            X = super().create_X(data, channel, times)
-            super().train(X,y)
-        
-        super()._reshape_attributes((n_channels,-1))
-
     def get_group_accuracies(self, y):
         """Get all the collective prediction accuracies of top channels for all group sizes"""
         predictions = self._get_predictions()
@@ -186,7 +171,7 @@ class TrainOptimalTimeWindows(LogisticReg):
 
         return accuracies, peak_accuracy_group_idx
 
-    def get_optimal_channel_combination(self, y, max_channels=20):
+    def get_optimal_channel_combination(self, y, max_channels=10):
         """
         Get the optimal channel combination to use for collective prediction. 
         Channels used to find combination is specified by max_channels.
@@ -223,6 +208,30 @@ class TrainOptimalTimeWindows(LogisticReg):
 
         plt.savefig(out_path + '_optimal_time_window_all_group_accuracies.png')
         plt.show()
+    
+    def plot_freq_box_plots(self, y:np.ndarray, channels:list, out_path:str=None):
+        """Plot box-and-whisker plots of the power of each frequency band for each channel in the optimal combination"""
+        optimal_time_window_info_channels = [lst[0] for lst in self._optimal_time_windows_per_channel]
+        for ch in channels:
+            idx = np.where(optimal_time_window_info_channels == ch)[0][0]
+
+            bet_powers = np.concatenate((self.low_bet_powers[idx], self.high_bet_powers[idx])).flatten()
+
+            powers = {
+                'Z-Scored Powers' : bet_powers,
+                'Frequency Band' : np.tile(['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'], int(len(bet_powers) / 5)),
+                'Category' : np.concatenate((np.repeat('Low Bet', 5*(len(y) - y.sum())), np.repeat('High Bet', 5*y.sum())))
+            }
+
+            power_df = pd.DataFrame(powers)
+
+            fig, axs = plt.subplots(1, 1, figsize=(20, 5))
+            sns.boxplot(data=power_df, x='Frequency Band', y='Z-Scored Powers', hue='Category', ax=axs)
+            axs.set_title(f'Channel {ch} - {self._elec_areas[ch]}')
+
+            plt.savefig(out_path + '_power_per_freq_box_plots.png')
+            plt.show()
+
 
     def plot_heatmap(self, channels:list, event_delay:int, top_accuracy:float = None, optimal_combination:bool=False, out_path:str=None):
         """
@@ -282,3 +291,19 @@ class TrainOptimalTimeWindows(LogisticReg):
 
         plt.savefig(path, bbox_inches='tight')
         plt.show()
+
+    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10, filter_channels:bool=True):
+        """Train LDA model on the optimal time windows for top performing channels, specified by n_channels"""
+        results = self._multiprocessing_time_window_grid_search(data, y, n_processes, filter_channels=filter_channels)
+
+        # Unravel the results from the multiprocessing and sort them by channels
+        optimal_time_windows_per_channel = [item for sublist in results for item in sublist]
+        optimal_time_windows_per_channel.sort(key=lambda x: x[0])
+        optimal_time_windows_per_channel.sort(key=lambda x: x[2], reverse=True)
+        self._optimal_time_windows_per_channel = optimal_time_windows_per_channel
+
+        for channel, times, _ in optimal_time_windows_per_channel[:n_channels]:
+            X = super().create_X(data, channel, times)
+            super().train(X,y)
+        
+        super()._reshape_attributes((n_channels,-1))
