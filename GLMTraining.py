@@ -4,7 +4,6 @@ import mat73
 import numpy as np
 
 # from LDA import TrainOptimalTimeWindows
-
 from LDA import TrainOptimalTimeWindows
 
 # %%
@@ -82,11 +81,12 @@ for sub in subs:
     clf.plot_accuracies(y, out_path_plots)
     clf.plot_heatmap(top_chs, 3, accuracies[peak_accuracy_group_idx], False, out_path_plots)
     optimal_time_window_channel_combination = elec_areas[top_chs]
-    np.save(out_path_metrics + '_optimal_time_window_channel_combination.npy', optimal_time_window_channel_combination)
+    np.save(out_path_metrics + '_top_n_channel_combination.npy', optimal_time_window_channel_combination)
 
     results = clf.get_optimal_channel_combination(y, max_channels=10)
+    clf.plot_freq_box_plots(y, results[0][0], out_path_plots)
     clf.plot_heatmap(results[0][0], 3, results[0][1], True, out_path_plots)
     optimal_time_window_optimal_channel_combination = elec_areas[results[0][0]]
-    np.save(out_path_metrics + '_optimal_time_window_optimal_channel_combination_10.npy', optimal_time_window_optimal_channel_combination)
+    np.save(out_path_metrics + '_optimal_channel_combination_10.npy', optimal_time_window_optimal_channel_combination)
 ## %%
 # %%
