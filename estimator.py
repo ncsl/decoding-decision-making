@@ -231,7 +231,7 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
             powers = {
                 'Z-Scored Powers' : bet_powers,
                 'Frequency Band' : np.tile(['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'], int(len(bet_powers) / 5)),
-                'Category' : np.concatenate((np.repeat('Low Bet', 5*(len(y) - y.sum())), np.repeat('High Bet', 5*y.sum())))
+                'Category' : np.concatenate((np.repeat('Low Card', 5*(len(y) - y.sum())), np.repeat('High Card', 5*y.sum())))
             }
 
             power_df = pd.DataFrame(powers)
@@ -281,13 +281,13 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
             heatmap_array[i,time_window[0]:time_window[1]] = accuracy
             accuracies.append(accuracy)
 
-        fig, axs = plt.subplots(1, 1, figsize=(10, 25))
+        fig, axs = plt.subplots(1, 1, figsize=(15, 15))
         sns.heatmap(heatmap_array, ax=axs, cmap='PRGn', vmin=np.min(accuracies)-.05, vmax=np.max(accuracies), center=np.min(accuracies)-.05, cbar_kws={"label":"Channel Accuracy"})
         
         axs.set_ylabel('Channel')
         axs.set_xlabel('Time (s)')
         axs.set_xticks(np.arange(0, self._num_timesteps, 5))
-        axs.set_xticklabels(time[::5])
+        axs.set_xticklabels(time[::5], rotation = 90)
         axs.set_yticks(np.arange(len(channels))+0.5)
         axs.set_yticklabels(np.asarray(self._elec_areas)[channels_sorted_by_time_window], rotation = 0)
         axs.axvline(np.argmin(np.abs(time)) + 1, color = 'blue', alpha=1, ls = '--')
