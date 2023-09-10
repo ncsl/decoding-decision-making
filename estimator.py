@@ -9,7 +9,9 @@ from helper_functions import _generate_sampled_channels, _find_combinations, _ge
 from abc import ABC, abstractmethod
 
 class Estimator(ABC):
-    def __init__(self, data, setup_data):
+    """Abstract class for all estimators used to decode behavior from neural data"""
+
+    def __init__(self, data:np.ndarray, setup_data):
         self._num_trials, self._num_channels, self._num_freqs, self._num_timesteps = data.shape
         
         self._elec_areas = setup_data['elec_area']
@@ -18,6 +20,7 @@ class Estimator(ABC):
         self._reset_metrics()
 
     def _reset_metrics(self):
+        """Reset all the metrics of the estimator class"""
         self.mean_scores = []
         self.dvals = []
         self.low_bet_powers = []
@@ -25,13 +28,25 @@ class Estimator(ABC):
         self.diff_avg_powers = []
 
     def _reshape_attributes(self, new_shape:tuple):
-        """Reshape class attributes to specified shape"""
+        """Reshape class attributes to be a specified shape"""
         for attr_name in self.__dict__.keys():
             if not attr_name.startswith('_'):
                 setattr(self, attr_name, np.reshape(getattr(self, attr_name), new_shape))
 
-    def create_X(self, data, channel, time):
-        """Create the X data that will be used to train the LDA model"""
+    def create_X(self, data:np.ndarray, channel:int, time:int):
+        """Create the X data that will be used to train the estimator
+        
+        Parameters
+        ----------
+        data : np.ndarray
+            The dataset used to train the estimator
+        
+        channel : int
+            The index of the channel to create the X data from
+        
+        time : int or list
+            The index(s) of time to create the X data from
+        """
         if hasattr(self, '_time_resolution') and type(self._time_resolution) == int:
             X = data[:, channel, :, time:time+self._time_resolution].mean(-1)
         elif type(time) == list and len(time) == 2:
@@ -45,7 +60,7 @@ class Estimator(ABC):
         return X
     
     def filter_channels(self):
-        """Filters out channels that are in particular anatomical locations"""
+        """Filters out any channels that are in particular anatomical location"""
         filtered_elec_areas_idxs = [i for i,ea in enumerate(self._elec_areas) if ea not in 
                                     ['white matter','CZ','PZ', 'out','FZ','cerebrospinal fluid',
                                      'lesion L','ventricle L','ventricle R']]
@@ -64,8 +79,11 @@ class Estimator(ABC):
                 self._timesteps_rescaled = int(self._num_timesteps/kwargs['time_resolution'])
 
 class EstimatorTrainOptimalTimeWindows(Estimator):
+    """Abstract class to train an estimator on the optimal time windows for each channel"""
+
     @abstractmethod
     def train(self):
+        """Abstract method that specifies how the estimator is trained and what metrics are computed"""
         pass
 
     def _create_time_windows(self):
@@ -81,9 +99,9 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         return time_windows
     
     def _get_predictions(self):
+        """Get the predictions for each trial by each channel"""
         predictions = []
 
-        # Get predictions for each trial by each channel
         for trial in range(self._num_trials):
             trial_predictions = []
             for dval in self.dvals[:,trial]:
@@ -99,8 +117,9 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return predictions
     
-    def _grid_search_on_channel_combinations(self, y, max_channels=20):
-        assert max_channels <= 20, 'Cannot perform grid search on more than 20 channels'
+    def _grid_search_on_channel_combinations(self, y:np.ndarray, max_channels:int=10):
+        """Perform a grid search to find the optimal channel combination that leads to the most accurate collective prediction. Number of channels to search is specified by max_channels. """
+        assert max_channels <= 20, 'Cannot perform grid search on more than 20 channels due to computational complexity'
 
         predictions = self._get_predictions()
             # Find all possible channel combinations to use for collective prediction
@@ -130,9 +149,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return all_channel_idxs_combinations, accuracies
 
-    def _time_window_grid_search(self, data, y, channels):
-        """Train logistic regression model on all possible time windows, 
-        store the time windows that correspond with the highest accuracy."""
+    def _time_window_grid_search(self, data:np.ndarray, y:np.ndarray, channels:list):
+        """Train an estimator on all possible time windows, store the time windows that correspond with the highest accuracy."""
 
         time_windows = self._create_time_windows()
         best_time_windows = []
@@ -148,8 +166,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         
         return best_time_windows
 
-    def _multiprocessing_time_window_grid_search(self, data, y, n_processes, filter_channels:bool = True):
-        """Perform a time window grid search in parallel"""
+    def _multiprocessing_time_window_grid_search(self, data:np.ndarray, y:np.ndarray, n_processes:int, filter_channels:bool = True):
+        """Perform the time window grid search using multiprocessing"""
         if filter_channels:
             filtered_elec_areas_idxs, _, __ = super().filter_channels()
             channels = filtered_elec_areas_idxs
@@ -167,8 +185,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         
         return results
 
-    def get_group_accuracies(self, y):
-        """Get all the collective prediction accuracies of top channels for all group sizes"""
+    def get_group_accuracies(self, y:np.ndarray):
+        """Compute the collective prediction accuracies for top n performing channels, where n is [0, num_channels]"""
         predictions = self._get_predictions()
         accuracies = []
 
@@ -181,10 +199,10 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return accuracies, peak_accuracy_group_idx
 
-    def get_optimal_channel_combination(self, y, max_channels=10):
+    def get_optimal_channel_combination(self, y:np.ndarray, max_channels:int=10):
         """
-        Get the optimal channel combination to use for collective prediction. 
-        Channels used to find combination is specified by max_channels.
+        Find the optimal channel combination that leads to the most accurate collective prediction. 
+        Number of channels to search is specified by max_channels.
         """
 
         all_channel_idxs_combinations, accuracies = self._grid_search_on_channel_combinations(y, max_channels=max_channels)
@@ -204,8 +222,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return max_accuracies
     
-    def plot_accuracies(self, y, out_path:str=None):
-        """Plot the collective prediction accuracy for each group size of top performing channels"""
+    def plot_accuracies(self, y:np.ndarray, out_path:str=None):
+        """Plot the collective prediction accuracy for the top n performing channels, where n is [0, num_channels]."""
         accuracies, peak_accuracy_group_idx = self.get_group_accuracies(y)
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -221,7 +239,7 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
             plt.show()
     
     def plot_freq_box_plots(self, y:np.ndarray, channels:list, out_path:str=None):
-        """Plot box-and-whisker plots of the power of each frequency band for each channel in the optimal combination"""
+        """Plot box-and-whisker plots of the frequency band power for each channel in the optimal channel combination"""
         optimal_time_window_info_channels = [lst[0] for lst in self._optimal_time_windows_per_channel]
         for ch in channels:
             idx = np.where(optimal_time_window_info_channels == ch)[0][0]
@@ -247,8 +265,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
     def plot_heatmap(self, channels:list, event_delay:int, top_accuracy:float = None, optimal_combination:bool=False, out_path:str=None):
         """
-        Plot a heatmap of the accuracy of the selected channels for their respective time windows.
-        Heatmap is sorted by the accuracy of the time window.
+        Plot a heatmap visualizing channel accuracy and their respective optimal time windows.
+        Heatmap is sorted by time window start time.
         """
 
         # Convert the number of time steps to seconds
@@ -295,16 +313,35 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         axs.tick_params(axis='y', pad=25)
         if out_path is not None:
             if optimal_combination:
-                axs.set_title(f'Accuracy of Optimal Combination of Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
+                axs.set_title(f'Accuracy of Channels in Optimal Channel Combination During Optimal Time Window\nCollective Accuracy: {top_accuracy:.2f}')
                 path = out_path + '_optimal_time_window_and_combination_heatmap.png'
             else:
-                axs.set_title(f'Accuracy of Top {len(channels)} Channels for a Given Time Window\nAccuracy: {top_accuracy:.2f}')
+                axs.set_title(f'Accuracy of Top {len(channels)} Channels During Optimal Time Window\nCollective Accuracy: {top_accuracy:.2f}')
                 path = out_path + '_optimal_time_window_heatmap.png'
             plt.savefig(path, bbox_inches='tight')
             plt.show()
 
-    def train_on_optimal_time_windows(self, data, y, n_processes, n_channels=10, filter_channels:bool=True):
-        """Train LDA model on the optimal time windows for top performing channels, specified by n_channels"""
+    def train_on_optimal_time_windows(self, data:np.ndarray, y:np.ndarray, n_processes:int, n_channels:int=10, filter_channels:bool=True):
+        """Compute metrics of top n performing channels in their optimal time windows.
+        
+        Parameters
+        ----------
+        data : np.ndarray
+            The dataset used to train the estimator
+        
+        y : np.ndarray
+            The y labels of the dataset
+        
+        n_processes : int
+            The number of processors to use for multiprocessing
+        
+        n_channels : int
+            The number of channels to train the estimator on
+
+        filter_channels : bool
+            Whether or not to filter out channels in particular anatomical locations
+
+        """
         results = self._multiprocessing_time_window_grid_search(data, y, n_processes, filter_channels=filter_channels)
 
         # Unravel the results from the multiprocessing and sort them by channels

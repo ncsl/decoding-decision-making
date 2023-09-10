@@ -10,7 +10,7 @@ import seaborn as sns
 
 class LDA(Estimator):
     """Class to train LDA model on data"""
-    def __init__(self, data, setup_data):
+    def __init__(self, data:np.ndarray, setup_data):
         super().__init__(data, setup_data)
 
         self.t_stats = []
@@ -18,7 +18,7 @@ class LDA(Estimator):
         self.std_scores = []
         self.p_vals = []
 
-    def train(self, X, y):
+    def train(self, X:np.ndarray, y:np.ndarray):
         """Train LDA model on specified X data and y labels"""
         low_bet_powers = X[np.where(y == 0)]
         high_bet_powers = X[np.where(y == 1)]
@@ -53,7 +53,7 @@ class LDA(Estimator):
         self.t_stats.append(t_stat)
         self.p_vals.append(p_val)
     
-    def create_cluster_idxs(self, threshold):
+    def create_cluster_idxs(self, threshold:float):
         """Creates statistical clusters based on the t-statistics computed from LDA decision values"""
         if self.t_stats.shape == (self._num_channels, self._timesteps_rescaled, 1):
             cluster_idxs = []
@@ -80,7 +80,7 @@ class LDA(Estimator):
         else:
             Exception('Cannot create clusters with these attributes, make sure shape of attributes is (num_channels, timesteps_rescaled, 1)')
 
-    def compute_t_stat_clusters(self, threshold):
+    def compute_t_stat_clusters(self, threshold:float):
         """Computes the sum of the t-statistics in each cluster"""
         t_stat_sums = []
 
@@ -129,7 +129,7 @@ class PerChannelAndTimestep(LDA):
             self.sorted_elec_names = [self._elec_names[i] for i in sorted_indices]
             self.sorted_elec_areas = [self._elec_areas[i] for i in sorted_indices]
 
-    def train_per_channel_and_timestep(self, data, y, time_resolution, filter_channels:bool = True):
+    def train_per_channel_and_timestep(self, data:np.ndarray, y:np.ndarray, time_resolution:int, filter_channels:bool = True):
         """Train an LDA model on each channel and timestep"""
         super().set_attributes(time_resolution=time_resolution)
 
@@ -141,7 +141,7 @@ class PerChannelAndTimestep(LDA):
         super()._reshape_attributes((self._num_channels,self._timesteps_rescaled,-1))
         self._sort_scores(filter_channels)
 
-    def plot_sorted_scores(self, event_delay, out_path:str):
+    def plot_sorted_scores(self, event_delay:int, out_path:str):
         """Visualize the LDA model scores (sorted from greatest to least) for all channels."""
         num_channels = len(self.sorted_max_mean_scores)
         
@@ -457,16 +457,6 @@ class PerTimestep(LDA):
         self._sort_scores()
         self._convert_timesteps_to_time(3)
 
-class PerChannelAllTimesteps(LDA):
-    def train_on_all_timesteps(self, data, y):
-        """Train an LDA model on all the timesteps for each channel"""
-        for channel in range(self._num_channels):
-            X = super().create_X(data, channel, np.arange(self._num_timesteps))
-            X_reshaped = X.reshape(self._num_trials, -1)
-            super().train(X_reshaped, y)
-        
-        super()._reshape_attributes((self._num_channels,-1))
-
 class ShuffledLDA(PerChannelAndTimestep):
     def __init__(self, data, setup_data):
         super().__init__(data, setup_data)
@@ -479,7 +469,7 @@ class ShuffledLDA(PerChannelAndTimestep):
 
         self.__sub_hand = setup_data['filters']['card1'][good_trials] # get the subject's card hand for the good trials
     
-    def _shuffle_y(self, y, setup_data):
+    def _shuffle_y(self, y:np.ndarray, setup_data):
         """
         Randomly shuffle the elements of y to be in different locations.
 
@@ -521,12 +511,12 @@ class ShuffledLDA(PerChannelAndTimestep):
 
         return y_shuffled
     
-    def train_per_channel_and_timestep(self, data, y, setup_data, time_resolution):
+    def train_per_channel_and_timestep(self, data:np.ndarray, y:np.ndarray, setup_data, time_resolution:int):
         """Use shuffled y labels to train LDA model on each channel and timestep"""
         y_shuffled = self._shuffle_y(y, setup_data)
         super().train_per_channel_and_timestep(data, y_shuffled, setup_data=setup_data, time_resolution=time_resolution)
 
-    def compute_t_stat_clusters(self, ref_estimator, threshold):
+    def compute_t_stat_clusters(self, ref_estimator, threshold:np.ndarray):
         """Computes the sum of the t-statistics for a cluster specified by a reference LDA estimator"""
         t_stat_sums = []
 
