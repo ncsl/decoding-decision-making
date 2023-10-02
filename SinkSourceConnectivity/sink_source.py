@@ -69,32 +69,34 @@ class SinkSource():
         
         return lap_ref_data
 
-    def _snapshot_data(self, raw_file, onset_delay=3):
+    def _snapshot_data(self, raw_file, event:int, time_interval:list):
         lap_ref_data = self._laplacian_reference(raw_file)
         dsFs = 500
 
         good_trials = self._setup_data['filters']['trial'][self._setup_data['filters']['success']].astype(int)-1
         num_trials = len(good_trials)
         
-        snapshot_data = np.zeros((num_trials,lap_ref_data.shape[0],int(3*dsFs)))
+        window_length = np.abs(time_interval[0])+ np.abs(time_interval[1])
 
-        # Snapshot around movement onset (-3 sec to +2 sec)
+        snapshot_data = np.zeros((num_trials,lap_ref_data.shape[0],int(window_length*dsFs)))
+
+        # Snapshot around designated event
         for i,t in enumerate(good_trials):
-            start_move_time = self._setup_data['trial_times'][t][0][self._setup_data['trial_words'][t][0]==35][0]
+            event_time = self._setup_data['trial_times'][t][0][self._setup_data['trial_words'][t][0]==event][0]
             #print(f'start move time = {start_move_time} for trial {t}')
             
             ## To go from the time to the index position in the lfp array, multiply time by Fs 
-            start_move_index = int(start_move_time*dsFs)
+            # start_move_index = int(start_move_time*dsFs)
             #print(f'start move index = {start_move_index} for trial {t}')
-            start_index = int((start_move_time - onset_delay)*dsFs)
-            end_index = start_index+int(onset_delay*dsFs)#int((start_move_time + 2.0)*Fs)
+            start_index = int((event_time + time_interval[0])*dsFs)
+            end_index = start_index+int(window_length*dsFs)#int((start_move_time + 2.0)*Fs)
             data_slice = lap_ref_data[:,start_index:end_index]
             snapshot_data[i,:,:] = data_slice
 
         return snapshot_data
     
-    def get_data(self, raw_file, onset_delay=3):
-        snapshot_data = self._snapshot_data(raw_file, onset_delay)
+    def get_data(self, raw_file, event:int, time_interval:list):
+        snapshot_data = self._snapshot_data(raw_file, event, time_interval)
         return snapshot_data[:,self._filtered_elec_areas_idxs,:]
     
     def get_y(self):
@@ -112,7 +114,7 @@ class SinkSource():
         A_hat = Y @ np.linalg.pinv(Z)
         return A_hat
     
-    def _estimateA_subject(self, data, fs=500, winsize=0.2):
+    def _estimateA_trial(self, data, fs=500, winsize=0.5):
         window = int(np.floor(winsize * fs))
         time = data.shape[1]
         n_chs = data.shape[0]
@@ -126,11 +128,11 @@ class SinkSource():
                     print(f"{win}/{n_wins} is computed")
         return A_hat
     
-    def estimateA_all_subjects(self, data):
-        n_subs = data.shape[0]
+    def estimateA_all_trials(self, data):
+        n_trials = data.shape[0]
         A_hat_all = []
-        for sub in range(0,n_subs):
-            A_hat_all.append(self._estimateA_subject(data[sub]))
+        for trial in range(0,n_trials):
+            A_hat_all.append(self._estimateA_trial(data[trial]))
 
         A_hat_all = np.asarray(A_hat_all)
 
@@ -216,7 +218,7 @@ class SinkSource():
         sns.heatmap(SI_wins_sorted, ax=axs, xticklabels=time, yticklabels=labels_sort,cmap=sns.color_palette("rainbow", as_cmap=True), cbar_kws={"pad": 0.01, 'label': 'Sink Index'})
         sns.set(font_scale=0.8)
 
-        axs.set_title('Difference in Sink Index for High and Low Bet Trials')
+        axs.set_title('Sink index over time for all channels')
         axs.set_xlabel('Time (s)')
         axs.set_ylabel('Channel Area | Channel Name')
 
