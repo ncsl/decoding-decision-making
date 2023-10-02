@@ -12,8 +12,8 @@ from scipy import signal,stats
 #setup_path = '/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT06/EFRI06_WAR_SES1_Setup.mat'
 #raw_path = '/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT06/EFRI06_WAR_SES1_Raw.mat'
 
-subs = ['06','07','10','12','13','15','16','17','18','21']
-subs = ['17','18','21']
+# subs = ['06','07','10','12','13','15','16','17','18','21']
+# subs = ['17','18','21']
 subs=['16']
 for sub in subs:
     setup_path = f'/mnt/ncsl_share/Public/EFRI/1_formatted/SUBJECT{sub}/EFRI{sub}_WAR_SES1_Setup.mat'
