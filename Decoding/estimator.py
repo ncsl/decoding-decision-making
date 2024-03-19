@@ -4,7 +4,7 @@ import seaborn as sns
 import pandas as pd
 
 from multiprocessing import Pool
-from helper_functions import _generate_sampled_channels, _find_combinations, _get_collective_predictions, _get_collective_prediction_accuracy
+from helper_functions import _generate_multiprocessing_groups, _find_combinations, _get_collective_predictions, _get_collective_prediction_accuracy
 
 from abc import ABC, abstractmethod
 
@@ -91,8 +91,8 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         time_windows = []
         for i in range(self._num_timesteps):
             for j in range(self._num_timesteps):
-                if i-j >= 0 and i+j <= self._num_timesteps:
-                    time_windows.append([i-j,i+j])
+                if i+j <= self._num_timesteps:
+                    time_windows.append([i,i+j])
                 else:
                     break
         
@@ -105,7 +105,7 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         for trial in range(self._num_trials):
             trial_predictions = []
             for dval in self.dvals[:,trial]:
-                if dval >= 0:
+                if dval > 0:
                     channel_prediction = 1
                 else:
                     channel_prediction = 0
@@ -117,16 +117,16 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return predictions
     
-    def _grid_search_on_channel_combinations(self, y:np.ndarray, max_channels:int=10):
-        """Perform a grid search to find the optimal channel combination that leads to the most accurate collective prediction. Number of channels to search is specified by max_channels. """
-        assert max_channels <= 20, 'Cannot perform grid search on more than 20 channels due to computational complexity'
+    def _channel_combination_grid_search(self, y:np.ndarray, n_channels:int=10):
+        """Perform a grid search to find the optimal channel combination that leads to the most accurate collective prediction. Number of channels to search is specified by n_channels. """
+        assert n_channels <= 20, 'Cannot perform grid search on more than 20 channels due to computational complexity'
 
         predictions = self._get_predictions()
             # Find all possible channel combinations to use for collective prediction
         all_channel_idxs_combinations = []
-        for i in range(max_channels):
+        for i in range(n_channels):
             # Find all possible channel combinations of length i+1
-            channel_combinations = _find_combinations(max_channels, i+1)
+            channel_combinations = _find_combinations(n_channels, i+1)
             all_channel_idxs_combinations.append(channel_combinations)
 
         # Grid search on optimal channel combination to use for collective prediction
@@ -166,27 +166,27 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         
         return best_time_windows
 
-    def _multiprocessing_time_window_grid_search(self, data:np.ndarray, y:np.ndarray, n_processes:int, filter_channels:bool = True):
+    def _multiprocessing_time_window_grid_search(self, data:np.ndarray, y:np.ndarray, n_processes:int, channels:np.ndarray=None):
         """Perform the time window grid search using multiprocessing"""
-        if filter_channels:
-            filtered_elec_areas_idxs, _, __ = super().filter_channels()
-            channels = filtered_elec_areas_idxs
-        else:
+        if channels is None:
+        #     filtered_elec_areas_idxs, _, __ = super().filter_channels()
+        #     channels = filtered_elec_areas_idxs
+        # else:
             channels = np.arange(self._num_channels)
 
-        sample_size = round(len(channels)/n_processes)
+        group_size = round(len(channels)/n_processes)
 
-        sampled_channels = _generate_sampled_channels(channels, sample_size, [])
+        grouped_channels = _generate_multiprocessing_groups(channels, group_size, [])
 
         # if __name__ == '__main__':
         with Pool(n_processes) as p:
-            results = p.starmap(self._time_window_grid_search, [(data, y, channels) for channels in sampled_channels])
+            results = p.starmap(self._time_window_grid_search, [(data, y, channels) for channels in grouped_channels])
             p.close()
         
         return results
 
     def get_group_accuracies(self, y:np.ndarray):
-        """Compute the collective prediction accuracies for top n performing channels, where n is [0, num_channels]"""
+        """Compute the collective prediction accuracies for top n performing channels, where n is [0, n_channels]"""
         predictions = self._get_predictions()
         accuracies = []
 
@@ -199,31 +199,51 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         return accuracies, peak_accuracy_group_idx
 
-    def get_optimal_channel_combination(self, y:np.ndarray, max_channels:int=10):
+    def get_optimal_channel_combination(self, y:np.ndarray, n_channels:int=10):
         """
         Find the optimal channel combination that leads to the most accurate collective prediction. 
-        Number of channels to search is specified by max_channels.
+        Number of channels to search is specified by n_channels.
         """
 
-        all_channel_idxs_combinations, accuracies = self._grid_search_on_channel_combinations(y, max_channels=max_channels)
+        channel_combinations, channel_combination_accuracies = self._channel_combination_grid_search(y, n_channels=n_channels)
 
-        optimal_time_windows_per_ch = self._optimal_time_windows_per_channel
-        max_accuracies = []
+        optimal_time_windows_per_channel = self._optimal_time_windows_per_channel
+        optimal_channels_and_time_windows = []
 
-        for i, accuracies in enumerate(accuracies):
+        for i, accuracies in enumerate(channel_combination_accuracies):
             optimal_chs = []
-            ch_idxs = all_channel_idxs_combinations[i][np.argmax(accuracies)]
+            ch_idxs = channel_combinations[i][np.argmax(accuracies)]
             for idx in ch_idxs:
-                optimal_chs.append(optimal_time_windows_per_ch[idx][0])
+                optimal_chs.append(optimal_time_windows_per_channel[idx])
 
-            max_accuracies.append([optimal_chs, np.max(accuracies)])
+            optimal_channels_and_time_windows.append([optimal_chs, np.max(accuracies)])
 
-        max_accuracies.sort(key=lambda x: x[1], reverse=True)
+        optimal_channels_and_time_windows.sort(key=lambda x: x[1], reverse=True)
 
-        return max_accuracies
+        peak_accuracy = 0
+        peak_accuracy_channel_combinations = []
+        for combination in optimal_channels_and_time_windows:
+            # Gets all combinations of the same peak accuracy
+            if combination[1] >= peak_accuracy:
+                peak_accuracy = combination[1] 
+                peak_accuracy_channel_combinations.append(combination[0])
+            else:
+                break
+            
+        optimal_combination = []
+        for combination in peak_accuracy_channel_combinations:
+            # Gets the combination with the most channels
+            if len(combination) > len(optimal_combination):
+                optimal_combination = combination
+
+        optimal_channel_combination = []
+        for info in optimal_combination:
+            optimal_channel_combination.append(info[0])
+
+        return peak_accuracy, optimal_channel_combination
     
     def plot_accuracies(self, y:np.ndarray, out_path:str=None):
-        """Plot the collective prediction accuracy for the top n performing channels, where n is [0, num_channels]."""
+        """Plot the collective prediction accuracy for the top n performing channels, where n is [0, n_channels]."""
         accuracies, peak_accuracy_group_idx = self.get_group_accuracies(y)
 
         fig, ax = plt.subplots(1, 1, figsize=(10, 10))
@@ -249,21 +269,21 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
             powers = {
                 'Z-Scored Powers' : bet_powers,
                 'Frequency Band' : np.tile(['Delta', 'Theta', 'Alpha', 'Beta', 'Gamma'], int(len(bet_powers) / 5)),
-                'Category' : np.concatenate((np.repeat('Low Card', 5*(len(y) - y.sum())), np.repeat('High Card', 5*y.sum())))
+                'Category' : np.concatenate((np.repeat('Low Bet', 5*(len(y) - y.sum())), np.repeat('High Bet', 5*y.sum())))
             }
 
             power_df = pd.DataFrame(powers)
 
             fig, axs = plt.subplots(1, 1, figsize=(20, 5))
             sns.boxplot(data=power_df, x='Frequency Band', y='Z-Scored Powers', hue='Category', ax=axs)
-            axs.set_title(f'Channel {ch} - {self._elec_areas[ch]}')
+            axs.set_title(f'Channel {self._elec_names[ch]} - {self._elec_areas[ch]}')
 
             if out_path is not None:
-                plt.savefig(out_path + f'_power_per_freq_box_plots_{ch}_{self._elec_areas[ch]}.png')
+                plt.savefig(out_path + f'_freq_power_box_plots_{self._elec_names[ch]}_{self._elec_areas[ch]}.png')
                 plt.show()
 
 
-    def plot_heatmap(self, channels:list, event_delay:int, top_accuracy:float = None, optimal_combination:bool=False, out_path:str=None):
+    def plot_heatmap(self, channels:list, event_delay:int, sub, top_accuracy:float = None, optimal_combination:bool=False, out_path:str=None):
         """
         Plot a heatmap visualizing channel accuracy and their respective optimal time windows.
         Heatmap is sorted by time window start time.
@@ -289,7 +309,7 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
 
         heatmap_array = np.zeros((len(channels), self._num_timesteps))
 
-        # Get the locations of the channels from the data strucure
+        # Create heatmap of accuracy in given time window for channels
         
         for i, (channel, time_window, accuracy) in enumerate(optimal_time_window_info_for_channels):
             # If time_window is exactly at one timestep, visualize the time window to be one timestep larger
@@ -302,26 +322,32 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
         fig, axs = plt.subplots(1, 1, figsize=(15, 15))
         sns.heatmap(heatmap_array, ax=axs, cmap='PRGn', vmin=np.min(accuracies)-.05, vmax=np.max(accuracies), center=np.min(accuracies)-.05, cbar_kws={"label":"Channel Accuracy"})
         
+        y_labels = []
+
+        for ch in channels_sorted_by_time_window:
+            y_label = f'{self._elec_names[ch]} | {self._elec_areas[ch]}'
+            y_labels.append(y_label)
+
         axs.set_ylabel('Channel')
         axs.set_xlabel('Time (s)')
         axs.set_xticks(np.arange(0, self._num_timesteps, 5))
         axs.set_xticklabels(time[::5], rotation = 90)
         axs.set_yticks(np.arange(len(channels))+0.5)
-        axs.set_yticklabels(np.asarray(self._elec_areas)[channels_sorted_by_time_window], rotation = 0)
+        axs.set_yticklabels(y_labels, rotation = 0)
         axs.axvline(np.argmin(np.abs(time)) + 1, color = 'blue', alpha=1, ls = '--')
 
         axs.tick_params(axis='y', pad=25)
         if out_path is not None:
             if optimal_combination:
-                axs.set_title(f'Accuracy of Channels in Optimal Channel Combination During Optimal Time Window\nCollective Accuracy: {top_accuracy:.2f}')
-                path = out_path + '_optimal_time_window_and_combination_heatmap.png'
+                axs.set_title(f'Accuracy and Time Windows of Channels in Optimal Channel Combination\nSubject: {sub} | Collective Accuracy: {top_accuracy:.2f}')
+                path = out_path + '_optimal_heatmap.png'
             else:
-                axs.set_title(f'Accuracy of Top {len(channels)} Channels During Optimal Time Window\nCollective Accuracy: {top_accuracy:.2f}')
-                path = out_path + '_optimal_time_window_heatmap.png'
+                axs.set_title(f'Accuracy and Time Windows of Top {len(channels)} Channels\nSubject: {sub} | Collective Accuracy: {top_accuracy:.2f}')
+                path = out_path + '_heatmap.png'
             plt.savefig(path, bbox_inches='tight')
             plt.show()
 
-    def train_on_optimal_time_windows(self, data:np.ndarray, y:np.ndarray, n_processes:int, n_channels:int=10, filter_channels:bool=True):
+    def train_on_optimal_time_windows(self, data:np.ndarray, y:np.ndarray, n_processes:int, n_channels:int=10, channels:np.ndarray=None):
         """Compute metrics of top n performing channels in their optimal time windows.
         
         Parameters
@@ -342,7 +368,7 @@ class EstimatorTrainOptimalTimeWindows(Estimator):
             Whether or not to filter out channels in particular anatomical locations
 
         """
-        results = self._multiprocessing_time_window_grid_search(data, y, n_processes, filter_channels=filter_channels)
+        results = self._multiprocessing_time_window_grid_search(data, y, n_processes, channels=channels)
 
         # Unravel the results from the multiprocessing and sort them by channels
         optimal_time_windows_per_channel = [item for sublist in results for item in sublist]

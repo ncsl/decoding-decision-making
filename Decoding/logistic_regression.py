@@ -23,7 +23,7 @@ class LogisticRegression(Estimator):
         dval = np.zeros(self._num_trials)
 
         for train, test in rkf.split(X):
-            clf = linear_model.LogisticRegression(random_state=0).fit(X[train], y[train])
+            clf = linear_model.LogisticRegression(penalty='l2', solver='lbfgs', C=1e-1).fit(X[train], y[train])
             estimators.append(clf)
             scores.append(clf.score(X[test], y[test]))
             dval[test] = np.dot(X[test], clf.coef_.T).T[0] + clf.intercept_
@@ -31,6 +31,6 @@ class LogisticRegression(Estimator):
         self.mean_scores.append(np.mean(scores))
         self.dvals.append(dval)
 
-class TrainOptimalTimeWindows(LogisticRegression, EstimatorTrainOptimalTimeWindows):
+class LogisticRegressionOptimal(LogisticRegression, EstimatorTrainOptimalTimeWindows):
     def __init__(self, data, setup_data):
         super().__init__(data, setup_data)

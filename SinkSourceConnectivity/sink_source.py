@@ -205,14 +205,18 @@ class SinkSource():
 
         return SI_wins_sorted, labels_sort
     
-    def plot_SI_heatmap(self, A_hat_all, SI_wins, winSize, fs, time, out_path_plots=None):
+    def plot_SI_heatmap(self, A_hat_all, SI_wins, winSize, fs, time, out_path_plots=None, **kwargs):
         t_W = np.arange(0, self.nWin, 1)
         t_sec = np.arange(0, self.nWin*winSize/fs, 0.5)
 
         t_W_fig = t_W.copy()
         t_W_fig = t_W_fig[::30*2] - t_W_fig[0]
 
-        SI_wins_sorted, labels_sort = self.sort_SI_wins(A_hat_all, SI_wins) 
+        if 'labels_sort' in kwargs:
+            labels_sort = kwargs['labels_sort']
+            SI_wins_sorted, _ = self.sort_SI_wins(A_hat_all, SI_wins) 
+        else:
+            SI_wins_sorted, labels_sort = self.sort_SI_wins(A_hat_all, SI_wins) 
 
         fig, axs = plt.subplots(1,1,figsize=(24, 15))
         sns.heatmap(SI_wins_sorted, ax=axs, xticklabels=time, yticklabels=labels_sort,cmap=sns.color_palette("rainbow", as_cmap=True), cbar_kws={"pad": 0.01, 'label': 'Sink Index'})
@@ -226,7 +230,7 @@ class SinkSource():
         plt.tight_layout()
 
         if out_path_plots is not None:
-            plt.savefig(out_path_plots + '_SI_difference_heatmaps.png', bbox_inches = 'tight')
+            plt.savefig(out_path_plots + '_SI_cognitive_state_heatmaps.png', bbox_inches = 'tight')
             plt.show()
 
     def SI_t_test(self, SI_wins_all, y):

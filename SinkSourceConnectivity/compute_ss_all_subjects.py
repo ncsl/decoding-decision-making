@@ -3,7 +3,7 @@ import h5py
 import mat73
 import numpy as np
 
-from sink_source import SinkSource
+from SinkSourceConnectivity.sink_source import SinkSource
 
 SI_t_test = []
 
