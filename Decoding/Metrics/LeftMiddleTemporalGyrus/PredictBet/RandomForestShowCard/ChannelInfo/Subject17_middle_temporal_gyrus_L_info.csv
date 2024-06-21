@@ -1,0 +1,10 @@
+Channel Names,Optimal Time Windows Start,Optimal Time Windows End,Accuracy
+C'8,37,52,0.69375
+C'9,21,35,0.66875
+C'7,52,60,0.6625
+B'7,0,31,0.65625
+C'10,0,3,0.65
+C'5,15,55,0.65
+B'9,25,51,0.64375
+C'6,22,29,0.625
+B'8,57,57,0.61875
